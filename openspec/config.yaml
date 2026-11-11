@@ -1,0 +1,37 @@
+schema: spec-driven
+
+context: |
+  Все артефакты OpenSpec пишутся на русском.
+  wallet-docs — справочный сервис стека (порт 8089): C++17, cpp-httplib, libpq. Отвечает
+  на вопросы «как работает система» по OpenSpec-спекам всех репозиториев организации:
+  Postgres с pgvector (своя база, роль только DML, расширение `vector` и схему заводят
+  инфраструктура и мигратор), гибридный поиск (полнотекст + вектор), ответ пишет LLM.
+  Сервис НЕОБЯЗАТЕЛЬНЫЙ модуль контура (compose-профиль `docs`, wallet-infra): ни один
+  другой сервис от него не зависит, без него клиенты скрывают раздел.
+  Доступ: за wallet-gateway на префиксе /api/docs/ (JWT-гейт, aud ∋ wallet-docs); сервис
+  сам проверяет токен по JWKS google-auth и берёт из него role и platform. Область
+  документации (какие репозитории и виды файлов видны) определяет только сервер.
+  Заливка индекса — PUT /docs/index/{repo} из Jenkins напрямую по сети контура, не через
+  гейтвей, по токену X-Index-Token. Индекс воспроизводим и в бэкап не входит.
+  LLM и эмбеддинги — LM Studio на хосте (GTX 1070 8 ГБ, один GPU): OpenAI-совместимые
+  POST {LLM_URL}/chat/completions и /embeddings; модели ≤ 8B Q4. Своих вызовов wallet-ai
+  нет — связности между сервисами не вводим.
+  Общий код (util/: jwt, jwks, jwt_claims, log, metrics, dotenv) — копия wallet-common в
+  third_party/wallet-common/, правится в wallet-common и копируется scripts/vendor.sh.
+  Каркас как у wallet-mcp/wallet-ai: /healthz, /version, /metrics, /openapi.yaml, /docs
+  (Swagger UI вендорен), JSON-логи с trace_id из X-Trace-Id.
+  LAN-only MVP; сборка — Docker (Containerfile, BUILD_JOBS=3), по одному C++-сервису за раз.
+  Общие планы — org/docs/TODO_*.md.
+
+rules:
+  specs:
+    - Каждое требование — с хотя бы одним сценарием WHEN/THEN
+    - Коды ответа, имена заголовков, поля JSON и тексты ошибок приводить дословно
+    - Полные схемы тел не дублировать — ссылаться на openapi.yaml этого сервиса
+  design:
+    - Явно указывать, нужна ли правка в другом сервисе (google-auth, wallet-gateway, wallet-infra, android-wallet, wallet-web) или в wallet-common
+    - Оценивать расход RAM/диска и влияние на единственный GPU (эмбеддинги и ответы делят его с чатом)
+  tasks:
+    - Каждая задача заканчивается проверкой — юнит-тест (ctest) или curl на живом стеке
+    - Изменение ручки сопровождается правкой openapi.yaml и README.md
+    - Схема БД — только новыми миграциями в migrations/, без правки уже накаченных

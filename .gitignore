@@ -1,0 +1,11 @@
+/build
+/build-tests
+/out
+/logs
+.env
+*.log
+*.lnk
+NUL
+__pycache__/
+*.pyc
+venv/
