@@ -28,6 +28,13 @@
 - **WHEN** роль сервиса пытается выполнить `CREATE TABLE`
 - **THEN** база отказывает (роль только DML), в работе сервиса это не нужно
 
+### Requirement: Недоступная база
+Если база недоступна при старте, сервис SHALL завершаться с кодом `1` и сообщением `database unavailable: <причина>` (перезапуск — политика `restart` compose). После старта недоступность базы SHALL давать `503` на вопросы и заливку, не затрагивая `/healthz` и статус.
+
+#### Scenario: База недоступна при старте
+- **WHEN** сервис запускается при остановленном Postgres
+- **THEN** в журнале `database unavailable: …`, код выхода 1
+
 ### Requirement: Служебные ручки
 Сервис SHALL отдавать без аутентификации `GET /healthz` (жив ли процесс, без обращения к базе и LLM), `GET /version` (`service`, `version`, `build`, `git_commit`, `started_at`), `GET /metrics`, `GET /openapi.yaml` и `GET /docs` (Swagger UI без внешних запросов).
 

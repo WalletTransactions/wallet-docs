@@ -7,11 +7,11 @@
 ## ADDED Requirements
 
 ### Requirement: Заливка индекса репозитория
-`PUT /docs/index/{repo}` SHALL принимать JSON `{"files": [{"path": "<путь внутри репозитория>", "content": "<markdown>"}]}` и заменять в индексе все чанки репозитория `{repo}` одной транзакцией. Имя репозитория SHALL соответствовать `^[a-z0-9][a-z0-9-]{0,63}$`. Успешный ответ — `200` с `{"repo", "chunks", "embedded", "reused"}`. Тело SHALL быть не больше 16 МБ, иначе `413`.
+`PUT /docs/index/{repo}` SHALL принимать JSON `{"files": [{"path": "<путь внутри репозитория>", "content": "<markdown>"}]}` и заменять в индексе все чанки репозитория `{repo}` одной транзакцией. Имя репозитория SHALL соответствовать `^[a-z0-9][a-z0-9-]{0,63}$`. Успешный ответ — `200` с `{"repo", "chunks", "embedded", "reused", "skipped"}`. Тело SHALL быть не больше 16 МБ, иначе `413`.
 
 #### Scenario: Первая заливка
 - **WHEN** Jenkins присылает файлы репозитория `android-wallet`, которого в индексе ещё нет
-- **THEN** ответ `200`, `chunks` равно числу полученных чанков, а `GET /api/docs/ask` по этому репозиторию начинает находить их
+- **THEN** ответ `200`, `chunks` равно числу полученных чанков, а `POST /api/docs/ask` по этому репозиторию начинает находить их
 
 #### Scenario: Повторная заливка заменяет старое
 - **WHEN** репозиторий залит повторно без файла, который был раньше
@@ -37,7 +37,7 @@
 - **THEN** заливка отвечает `503`, а `GET /api/docs/status` и вопросы работают по уже имеющемуся индексу
 
 ### Requirement: Вид и название чанка из пути
-Сервис SHALL определять вид (`kind`) и раздел (`capability`) по пути файла. `openspec/specs/<раздел>/spec.md` — `spec`; `openspec/changes/archive/<имя>/…` — `archive`; `openspec/changes/<имя>/…` — `change`. Файлы вне `openspec/`, не `.md` и пути с `..` SHALL игнорироваться и считаться в `skipped` ответа. Для `change` и `archive` разделом считается `<имя>`.
+Сервис SHALL определять вид (`kind`) и раздел (`capability`) по пути файла. `openspec/specs/<раздел>/spec.md` — `spec`; `openspec/changes/archive/<имя>/…` — `archive`; `openspec/changes/<имя>/…` — `change`. Для `change` и `archive` разделом считается `<имя>`.
 
 #### Scenario: Спека
 - **WHEN** присылается файл `openspec/specs/sync-run/spec.md`
@@ -46,6 +46,13 @@
 #### Scenario: Архив
 - **WHEN** присылается `openspec/changes/archive/2026-11-04-add-wallet-mcp-service/design.md`
 - **THEN** чанки имеют `kind` `archive`, а `capability` — `2026-11-04-add-wallet-mcp-service`
+
+### Requirement: Посторонние файлы пропускаются
+Индексироваться SHALL только `openspec/specs/<раздел>/spec.md` и `.md` внутри `openspec/changes/`. Остальное — `.md` в корне `openspec/` (например `project.md`), файлы вне `openspec/`, не `.md`, пути с `..` — SHALL пропускаться и считаться в `skipped` ответа.
+
+#### Scenario: Файл в корне openspec
+- **WHEN** присылается `openspec/project.md`
+- **THEN** файл не индексируется, `skipped` в ответе увеличен
 
 #### Scenario: Посторонний файл
 - **WHEN** присылается `src/main.cpp` или `../etc/passwd`
@@ -63,7 +70,7 @@
 - **THEN** она разбита на несколько чанков с одним и тем же `heading`
 
 ### Requirement: Эмбеддинги и повторное использование
-Сервис SHALL считать эмбеддинг чанка запросом `POST {LLM_URL}/embeddings` моделью `EMBED_MODEL`. Чанк с тем же `repo`, `path`, `heading` и хэшем содержимого, что в прежнем индексе, SHALL использовать прежний эмбеддинг без запроса. Если эмбеддинги недоступны, чанк SHALL сохраняться без вектора, а заливка — завершаться `200` с `embedded: 0`.
+Сервис SHALL считать эмбеддинг чанка запросом `POST {LLM_URL}/embeddings` моделью `EMBED_MODEL`, передавая текст с префиксом `search_document: `. Чанк с тем же `repo`, `path`, `heading` и хэшем содержимого, что в прежнем индексе, SHALL использовать прежний эмбеддинг без запроса. Если эмбеддинги недоступны, чанк SHALL сохраняться без вектора, а заливка — завершаться `200` с `embedded: 0`.
 
 #### Scenario: Повторная заливка без изменений
 - **WHEN** репозиторий залит второй раз тем же содержимым
