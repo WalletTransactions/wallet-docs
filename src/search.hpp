@@ -16,6 +16,13 @@ inline constexpr std::size_t kCandidates = 20;
 inline constexpr std::size_t kTop = 8;
 // RRF: score = Σ 1 / (k + rank), rank с 1.
 inline constexpr double kRrfK = 60.0;
+// Вес вклада RRF по виду документа: каноническая спека — истина о текущем
+// поведении, change (ещё не влит) и archive (история решений) — вторичны.
+// Без веса их кандидатов больше, и они вытесняют spec (замер 6.3).
+inline constexpr double kSpecWeight = 1.0;
+inline constexpr double kOtherKindWeight = 0.6;
+double kind_weight(const std::string& kind);
+
 // Косинусное расстояние (pgvector `<=>`), дальше которого вектор не
 // кандидат. Стартовое значение design D4, подбирается в задаче 6.3.
 inline constexpr double kMaxVectorDistance = 0.5;

@@ -6,6 +6,8 @@
 
 namespace search {
 
+double kind_weight(const std::string& kind) { return kind == "spec" ? kSpecWeight : kOtherKindWeight; }
+
 std::vector<store::Hit> fuse(const store::Candidates& c, std::size_t top, double k) {
     struct Entry {
         const store::Hit* hit = nullptr;
@@ -22,7 +24,7 @@ std::vector<store::Hit> fuse(const store::Candidates& c, std::size_t top, double
                 it->second.hit = &h;
                 it->second.first_seen = seen++;
             }
-            it->second.score += 1.0 / (k + static_cast<double>(i + 1));
+            it->second.score += kind_weight(h.kind) / (k + static_cast<double>(i + 1));
         }
     };
     add(c.text);
