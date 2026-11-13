@@ -87,7 +87,8 @@ int main() {
     }
     std::unique_ptr<llm::Chat> chat;
     if (cfg.chat_enabled()) {
-        chat = llm::make_http_chat({cfg.llm_url, cfg.llm_model, cfg.llm_api_key, cfg.llm_timeout_ms});
+        chat = llm::make_http_chat(
+            {cfg.llm_url, cfg.llm_model, cfg.llm_api_key, cfg.llm_timeout_ms, cfg.llm_reasoning_chat});
     } else {
         applog::warn("answers disabled (LLM_URL or LLM_MODEL empty): POST /api/docs/ask -> 503");
     }
@@ -139,6 +140,7 @@ int main() {
                  ") listening on http://" + cfg.host + ":" + std::to_string(cfg.port) +
                  " (google-auth: " + cfg.auth_url + ", llm: " + (cfg.llm_url.empty() ? "off" : cfg.llm_url) +
                  ", chat model: " + (cfg.llm_model.empty() ? "-" : cfg.llm_model) +
+                 ", reasoning: " + (cfg.llm_reasoning_chat.empty() ? "-" : cfg.llm_reasoning_chat) +
                  ", embed model: " + (cfg.embed_model.empty() ? "-" : cfg.embed_model) +
                  ", index upload: " + (cfg.index_token.empty() ? "off" : "on") + ")");
     if (!svr.listen(cfg.host, cfg.port)) {

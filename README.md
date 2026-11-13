@@ -104,6 +104,7 @@ curl -sS -X POST http://127.0.0.1:8091/api/docs/ask -H "Authorization: Bearer $J
 | `EMBED_MODEL` | нет | `text-embedding-nomic-embed-text-v1.5` (768 измерений); без неё поиск только полнотекстом |
 | `LLM_API_KEY` | нет | `Authorization: Bearer` к LLM |
 | `LLM_TIMEOUT_MS` | нет | дедлайн вызова LLM, по умолчанию 120000 |
+| `LLM_REASONING_CHAT` | нет | `reasoning_effort` чат-модели, по умолчанию `none` (как в wallet-ai): модели с рассуждением (gemma-4 в LM Studio) иначе тратят `max_tokens` на «мысли», отвечают пустым `content` и десятки секунд. Значения как у API (`low`, `medium`, `high`) передаются как есть; `off` — поле не передавать. Эмбеддингов не касается |
 | `INDEX_TOKEN` | нет | секрет заливки; без него `PUT /docs/index/*` — `503 index_disabled` |
 | `DB_POOL_SIZE` | нет | соединений с базой, по умолчанию 4 |
 | `HOST`, `PORT` | нет | по умолчанию `127.0.0.1:8089` |
