@@ -1,0 +1,173 @@
+# wallet-docs
+
+Справочный сервис стека WalletTransactions. Отвечает на вопросы «как это работает» по
+OpenSpec-спекам репозиториев. Change: [`openspec/changes/docs-service`](openspec/changes/docs-service/).
+
+```
+Android / web ─ JWT (aud wallet-docs) ─> wallet-gateway ─ /api/docs/* ─> wallet-docs ─┬─ JWKS ──────> google-auth
+Jenkins ──────── X-Index-Token ─ PUT /docs/index/{repo} (сеть контура) ─>     │        ├─ /embeddings ─> LM Studio
+                                                                             │        └─ /chat/completions
+                                                                             └─ Postgres (база docs, pgvector)
+```
+
+**Необязательный модуль.** Ни один сервис от wallet-docs не зависит. В контуре он
+включается compose-профилем `docs` (wallet-infra, change `wallet-docs-assistant`). Сам
+сервис обращается только к Postgres, google-auth (JWKS) и LM Studio, wallet-ai не вызывает.
+
+## Доступ и область
+
+- `/api/docs/*` приходит через гейтвей. Токен — JWT google-auth в `Authorization: Bearer`
+  или cookie `session`. Сервис проверяет его сам по JWKS
+  (`AUTH_SERVICE_URL/.well-known/jwks.json`, ключи грузятся при первом запросе):
+  подпись RS256, `exp`, `iss` = `google-auth`, `aud` ∋ `wallet-docs`, `scope` ∋
+  `docs:ask`. Если что-то не сходится — `401 {"error":"unauthorized"}`.
+- Область документации задаёт только сервер, по `role` и `platform` проверенного токена.
+  Таблица — константа в коде (`src/access.cpp`), а не настройка:
+
+  | Токен | Репозитории | Виды |
+  |---|---|---|
+  | `role: admin` (любая платформа) | все | `spec`, `change`, `archive` |
+  | `platform: android` | `android-wallet` | `spec` |
+  | `platform: web` | `wallet-web`, `wallet-web-eqdefault` | `spec` |
+  | иначе (`telegram`, `mcp`, без платформы) | — | `403 {"error":"forbidden"}` |
+
+- `/docs/index/{repo}` гейтвей не проксирует. Jenkins ходит напрямую по сети контура с
+  `X-Index-Token` = `INDEX_TOKEN`; токены сравниваются за постоянное время.
+
+## Эндпоинты
+
+Полный контракт — [`openapi.yaml`](openapi.yaml), Swagger UI — `GET /docs`.
+
+| Метод и путь | Что делает |
+|---|---|
+| `GET /api/docs/status` | `200 {"enabled":true}`, если раздел доступен пользователю; `403` при пустой области. От LLM и базы не зависит |
+| `POST /api/docs/ask` | `{"question"}` (1–1000 символов) → `{"answer","sources":[{"repo","capability","heading"}]}` |
+| `PUT /docs/index/{repo}` | `{"files":[{"path","content"}]}` → `{"repo","chunks","embedded","reused","skipped"}` |
+| `GET /healthz`, `/version`, `/metrics`, `/openapi.yaml`, `/docs` | служебные, без аутентификации |
+
+### Вопрос
+
+1. Проверяются токен и область, вопрос валидируется (`400`), затем лимит: не больше 6
+   вопросов в минуту на `sub`, иначе `429 {"error":"too_many_requests"}` с `Retry-After`.
+2. Вопрос эмбеддится с префиксом `search_query: `. Если эмбеддинги недоступны, поиск идёт
+   только полнотекстом.
+3. Гибридный поиск в SQL с фильтром области: полнотекст (`russian` + `simple`) и
+   векторный (косинусное расстояние ≤ `kMaxVectorDistance` = 0,5), по 20 кандидатов
+   каждым способом. Дальше слияние RRF (k = 60), в промпт идут лучшие 8.
+4. Кандидатов нет — ответ «В описании системы этого нет.» без вызова LLM.
+5. LLM получает фрагменты `[1]…[N]` как данные и отвечает только по ним, ставя номер
+   фрагмента после утверждений. В `sources` попадают фрагменты, на которые есть ссылки, в
+   порядке первой ссылки и без повторов. Маркеры `[n]` из `answer` удаляются. LLM
+   недоступна — `503 {"error":"llm_unavailable"}`, база — `503 {"error":"database_unavailable"}`.
+
+### Заливка индекса
+
+- Индексируются только `openspec/specs/<раздел>/spec.md` (вид `spec`) и `.md` внутри
+  `openspec/changes/<имя>/` (вид `change`, а в `archive/` — `archive`; раздел — имя
+  change). Остальное (`openspec/project.md`, файлы вне `openspec/`, пути с `..`) считается в
+  `skipped`.
+- Чанки: в любом `spec.md` — `## Purpose` и каждый `### Requirement:` вместе со
+  сценариями. В остальных `.md` — секции `##`. Чанк длиннее 6000 байт режется по абзацам с
+  тем же `heading`. Заголовки внутри блоков ``` не учитываются.
+- Эмбеддинги считаются пачками по 16 до транзакции (`search_document: ` + заголовок +
+  первые 4000 байт текста). Чанк с тем же `path`, `heading` и SHA-256 содержимого берёт
+  прежний вектор без запроса. Первая неудачная пачка выключает эмбеддинги до конца
+  заливки: остальные чанки сохраняются без вектора и ищутся полнотекстом.
+- Замена — одной транзакцией (`DELETE` + один `INSERT … unnest`). Читатели видят либо
+  старый индекс, либо новый. Ошибка базы — `500 {"error":"index_failed"}`, прежний индекс
+  цел.
+- Тело — до 16 МБ (`413`). **Нужен `Content-Type: application/json`**: httplib разбирает
+  тело без него как форму с лимитом 8 КБ и отвечает `413` уже на маленьком репозитории.
+
+```sh
+# Заливка одного репозитория (то же будет делать docs-index.sh, wallet-infra change docs-index-upload):
+python3 -c 'import json, pathlib, sys; r = pathlib.Path(sys.argv[1]); print(json.dumps({"files": [{"path": str(p.relative_to(r)), "content": p.read_text()} for p in sorted(r.glob("openspec/**/*.md"))]}))' ../android-wallet > /tmp/android.json
+curl -sS -X PUT http://127.0.0.1:8089/docs/index/android-wallet \
+    -H "X-Index-Token: $INDEX_TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/android.json
+
+# Вопрос (через гейтвей контура):
+curl -sS -X POST http://127.0.0.1:8091/api/docs/ask -H "Authorization: Bearer $JWT" \
+    -H 'Content-Type: application/json' -d '{"question":"Как работает синхронизация?"}'
+```
+
+## Конфигурация
+
+`.env` в рабочей директории; переменные окружения процесса приоритетнее. Образец —
+[`.env.example`](.env.example).
+
+| Переменная | Обязательна | Что делает |
+|---|---|---|
+| `DATABASE_URL` | да | строка libpq к базе docs; роль только DML |
+| `AUTH_SERVICE_URL` | да | google-auth для JWKS |
+| `LLM_URL` | нет | корень OpenAI API LM Studio (`http://host.docker.internal:1234/v1`) |
+| `LLM_MODEL` | нет | чат-модель ответа; без неё вопрос — `503 llm_unavailable` |
+| `EMBED_MODEL` | нет | `text-embedding-nomic-embed-text-v1.5` (768 измерений); без неё поиск только полнотекстом |
+| `LLM_API_KEY` | нет | `Authorization: Bearer` к LLM |
+| `LLM_TIMEOUT_MS` | нет | дедлайн вызова LLM, по умолчанию 120000 |
+| `INDEX_TOKEN` | нет | секрет заливки; без него `PUT /docs/index/*` — `503 index_disabled` |
+| `DB_POOL_SIZE` | нет | соединений с базой, по умолчанию 4 |
+| `HOST`, `PORT` | нет | по умолчанию `127.0.0.1:8089` |
+| `LOG_DIR`, `LOG_LEVEL` | нет | как у остальных сервисов |
+
+Если обязательная переменная пуста, сервис пишет `<KEY> must be set — … (см. README.md)` и
+завершается с кодом 1.
+
+Старт зависит только от базы. Если она недоступна, сервис пишет `database unavailable: …`
+и выходит с кодом 1: перезапуск — политика `restart` compose. Если нет таблицы
+`doc_chunks` или расширения `vector`, сервис выходит с «миграции не накатаны: …». DDL сервис
+не выполняет. Если база пропала после старта, вопросы и заливка получают `503`/`500`, а
+`/healthz` и статус работают дальше.
+
+## База
+
+- `migrations/000001_init.{up,down}.sql` — таблица `doc_chunks`: `repo`, `path`, `kind`,
+  `capability`, `heading`, `content`, `content_hash`, `embedding vector(768)`, `tsv`
+  (генерируемая колонка `russian || simple`), `indexed_at`. Индексы: `(repo, kind)` и GIN
+  по `tsv`. ANN-индекса нет: несколько тысяч чанков сканируются точно.
+- Миграции лежат в образе в `/migrations`, их накатывает `migrate.sh <env> docs`
+  wallet-infra. Расширение `vector` создаёт `init-db.sh` wallet-infra.
+- Индекс в бэкап не входит: он воспроизводится заливкой из Jenkins.
+
+## Метрики
+
+Кроме `http_requests_total` и `http_request_duration_seconds`:
+
+- `docs_answers_total{result}` — `answered`, `not_found`, `bad_request`, `rate_limited`,
+  `llm_unavailable`, `database_unavailable`;
+- `docs_answers_without_sources_total` — ответы LLM без единой ссылки `[n]`;
+- `docs_auth_rejected_total{reason}` — причины `401`/`403`;
+- `docs_index_total{result}` — `ok`, `unauthorized`, `bad_request`, `disabled`, `failed`.
+
+В журнале нет тел запросов (вопросов и текстов спек), есть только счётчики:
+`docs_search`, `docs_answered`, `docs_indexed`.
+
+## Сборка и проверка
+
+C++-сервисы на хосте собираются только в Docker, по одному за раз и с ограничением памяти:
+
+```sh
+docker build --memory=3g --build-arg BUILD_JOBS=3 --target test -f Containerfile .   # юнит-тесты (ctest)
+docker build --memory=3g --build-arg BUILD_JOBS=3 -f Containerfile -t wallet-docs:dev .
+bash scripts/it.sh wallet-docs:dev   # интеграция: pgvector, заливка, вопросы, отказы
+```
+
+`scripts/it.sh` поднимает одноразовый `pgvector/pgvector:pg16` с ролью только DML и
+заглушку google-auth/LM Studio (`scripts/it_stub.py`, нужны `pyjwt` и `cryptography`).
+Он заливает спеки соседних `../android-wallet` и `../wallet-gateway` и проверяет:
+миграцию вверх и вниз, отказ `CREATE TABLE` для роли сервиса, старт без базы и без
+миграций, повторную заливку без дублей и запросов эмбеддингов, откат при сбое `INSERT`,
+область по токену, отказ «не по теме» без вызова LLM, `503` без LLM и без базы, `429` на
+седьмой вопрос. Эмбеддинги заглушки — мешок слов, не модель: качество ответов проверяется
+только на живой LM Studio (задача 6.3).
+
+Замер с заглушкой: первая заливка `android-wallet` (≈950 КБ спек, 802 чанка) занимает
+≈1,1 с без учёта модели. Время с настоящей LM Studio — задача 3.4.
+
+## Версия и выпуск
+
+`VERSION` — номер, который отдаёт `GET /version`. Тег `vX.Y.Z-rc.N` собирает образ
+`ghcr.io/wallettransactions/wallet-docs:X.Y.Z-rc.N` (`.github/workflows/release.yml`),
+тег `vX.Y.Z` переносит тот же digest на финальный тег. Схема общая для всех сервисов.
+
+Общий код `third_party/wallet-common/` руками не правится: его обновляет
+`bash ../wallet-common/scripts/vendor.sh`.

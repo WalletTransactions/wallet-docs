@@ -1,0 +1,342 @@
+openapi: 3.0.3
+info:
+  title: wallet-docs
+  version: 0.1.0
+  description: |
+    Справочный сервис стека: отвечает на вопросы «как это работает» по OpenSpec-спекам
+    репозиториев (openspec/changes/docs-service).
+
+    - `/api/docs/*` — через wallet-gateway, JWT google-auth с `aud` ∋ `wallet-docs` и
+      `scope` ∋ `docs:ask` (Bearer или cookie `session`). Область документации задаёт сервер
+      по `role` и `platform` токена: admin — все репозитории и виды; android —
+      `android-wallet`, спеки; web — `wallet-web`, `wallet-web-eqdefault`, спеки; иначе 403.
+    - `/docs/index/{repo}` — только по сети контура (гейтвей не проксирует), Jenkins с
+      `X-Index-Token`.
+    - Служебные `/healthz`, `/version`, `/metrics`, `/openapi.yaml`, `/docs` — без аутентификации.
+servers:
+  - url: http://127.0.0.1:8089
+tags:
+  - name: docs
+    description: Вопросы пользователей (через гейтвей)
+  - name: index
+    description: Заливка индекса (Jenkins)
+  - name: service
+    description: Служебные ручки
+
+paths:
+  /api/docs/status:
+    get:
+      tags: [docs]
+      summary: Доступен ли раздел этому пользователю
+      description: |
+        Не зависит от LLM и базы (design D10): `200` значит «раздел подключён и доступен вам».
+        Клиенты по нему решают, показывать ли раздел.
+      security:
+        - bearer: []
+        - session: []
+      responses:
+        "200":
+          description: Раздел доступен
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enabled]
+                properties:
+                  enabled:
+                    type: boolean
+                    example: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/docs/ask:
+    post:
+      tags: [docs]
+      summary: Вопрос по документации
+      description: |
+        Гибридный поиск (полнотекст + вектор) в области пользователя, ответ LLM только по
+        найденным фрагментам. Нет подходящих фрагментов — `answer` «В описании системы этого
+        нет.» без вызова LLM. `sources` — фрагменты, на которые ссылается ответ, в порядке
+        первой ссылки, без повторов. Не больше 6 вопросов в минуту на пользователя.
+      security:
+        - bearer: []
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+                  description: Непустой, не длиннее 1000 символов.
+                  example: Как работает синхронизация?
+      responses:
+        "200":
+          description: Ответ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Answer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          description: Больше 6 вопросов за минуту
+          headers:
+            Retry-After:
+              description: Секунды до освобождения слота
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: too_many_requests
+        "503":
+          description: |
+            `llm_unavailable` — LLM не настроена или не ответила; `database_unavailable` — база
+            недоступна.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                llm:
+                  value:
+                    error: llm_unavailable
+                db:
+                  value:
+                    error: database_unavailable
+
+  /docs/index/{repo}:
+    put:
+      tags: [index]
+      summary: Заменить индекс репозитория
+      description: |
+        Принимает markdown-файлы `openspec/**` репозитория, режет их на чанки (требование со
+        сценариями, Purpose, секции `##`), считает эмбеддинги (повторно использует прежние по
+        хэшу) и заменяет чанки репозитория одной транзакцией. Индексируются только
+        `openspec/specs/<раздел>/spec.md` и `.md` внутри `openspec/changes/`; остальное
+        считается в `skipped`. Тело — не больше 16 МБ, `Content-Type: application/json`
+        обязателен (без него тело разбирается как форма с лимитом 8 КБ и получает `413`).
+      security:
+        - indexToken: []
+      parameters:
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+          example: android-wallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: object
+                    required: [path, content]
+                    properties:
+                      path:
+                        type: string
+                        example: openspec/specs/sync-run/spec.md
+                      content:
+                        type: string
+      responses:
+        "200":
+          description: Индекс заменён
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [repo, chunks, embedded, reused, skipped]
+                properties:
+                  repo:
+                    type: string
+                  chunks:
+                    type: integer
+                    description: Чанков в новом индексе репозитория
+                  embedded:
+                    type: integer
+                    description: Новых эмбеддингов (0 — LM Studio недоступна или выключена)
+                  reused:
+                    type: integer
+                    description: Эмбеддингов из прежнего индекса
+                  skipped:
+                    type: integer
+                    description: Файлов, которые не индексируются
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Нет `X-Index-Token` или он чужой
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: unauthorized
+        "413":
+          description: Тело больше 16 МБ
+        "500":
+          description: Ошибка базы до фиксации — прежний индекс цел
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: index_failed
+        "503":
+          description: Заливка выключена (`INDEX_TOKEN` не задан)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: index_disabled
+
+  /healthz:
+    get:
+      tags: [service]
+      summary: Процесс жив (без обращения к базе и LLM)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              example:
+                status: ok
+  /version:
+    get:
+      tags: [service]
+      summary: Версия сервиса
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    example: wallet-docs
+                  version:
+                    type: string
+                    example: 0.1.0
+                  build:
+                    type: string
+                    example: 0.1.0-rc.1
+                  git_commit:
+                    type: string
+                  started_at:
+                    type: string
+                    format: date-time
+  /metrics:
+    get:
+      tags: [service]
+      summary: Метрики Prometheus
+      description: |
+        Кроме HTTP-метрик: `docs_answers_total{result}`, `docs_answers_without_sources_total`,
+        `docs_auth_rejected_total{reason}`, `docs_index_total{result}`.
+      responses:
+        "200":
+          description: Текстовый формат 0.0.4
+  /openapi.yaml:
+    get:
+      tags: [service]
+      summary: Этот документ
+      responses:
+        "200":
+          description: OK
+  /docs:
+    get:
+      tags: [service]
+      summary: Swagger UI (вендорен, без внешних запросов)
+      responses:
+        "200":
+          description: OK
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    session:
+      type: apiKey
+      in: cookie
+      name: session
+    indexToken:
+      type: apiKey
+      in: header
+      name: X-Index-Token
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    Answer:
+      type: object
+      required: [answer, sources]
+      properties:
+        answer:
+          type: string
+          description: Текст ответа без маркеров `[n]`
+          example: Синхронизация запускается при открытии приложения и раз в 15 минут.
+        sources:
+          type: array
+          items:
+            type: object
+            required: [repo, capability, heading]
+            properties:
+              repo:
+                type: string
+                example: android-wallet
+              capability:
+                type: string
+                example: sync-run
+              heading:
+                type: string
+                example: Периодический запуск
+  responses:
+    BadRequest:
+      description: Неверный запрос
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Токен не прошёл проверку
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: unauthorized
+    Forbidden:
+      description: Область документации пуста для этого клиента
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: forbidden
