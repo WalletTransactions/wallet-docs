@@ -6,6 +6,7 @@
 
 #include "nlohmann/json.hpp"
 #include "util/log.hpp"
+#include "util/pg_recover.hpp"
 
 namespace db {
 
@@ -28,9 +29,19 @@ Database::Database(const std::string& conninfo) {
         throw std::runtime_error(err);
     }
     PQsetNoticeProcessor(conn_, ignore_notice, nullptr);
+    // Раз в минуту проверяем простаивающее соединение и переоткрываем его, если
+    // оно умерло. mutex_ занят — запрос идёт прямо сейчас, соединение живо.
+    keepalive_ = std::make_unique<pg_recover::Keepalive>([this] {
+        std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+        if (lock.owns_lock() &&
+            pg_recover::probe(conn_) == pg_recover::Health::Reconnected) {
+            PQsetNoticeProcessor(conn_, ignore_notice, nullptr);
+        }
+    });
 }
 
 Database::~Database() {
+    keepalive_.reset(); // остановить поток до PQfinish
     if (conn_ != nullptr) PQfinish(conn_);
 }
 
@@ -40,17 +51,17 @@ Result Database::exec(const std::string& sql, const std::vector<Param>& params) 
 }
 
 Result Database::exec_locked(const std::string& sql, const std::vector<Param>& params) {
-    // Соединение могло умереть (рестарт Postgres): PQreset переоткрывает его
-    // с теми же параметрами — как в wallet-ai/wallet-api.
-    if (PQstatus(conn_) != CONNECTION_OK) {
-        PQreset(conn_);
-        if (PQstatus(conn_) != CONNECTION_OK) {
-            std::string err = PQerrorMessage(conn_);
-            applog::error("db reconnect failed", {{"event", "db_reconnect_failed"}, {"error", err}});
-            throw QueryError("database unavailable: " + err, "");
-        }
-        PQsetNoticeProcessor(conn_, ignore_notice, nullptr);
-        applog::info("db reconnected", {{"event", "db_reconnected"}});
+    // Мёртвое соединение (рестарт Postgres, обрыв сети) обрабатывает
+    // pg_recover (util/pg_recover.hpp): проверка сокета ПЕРЕД запросом, а не
+    // только PQstatus (он не видит умерший сокет до первой неудачной записи),
+    // и один повтор для чтения, оборванного в ходе запроса. Запись автоматически
+    // не повторяется, внутри транзакции PQreset не вызывается. PQreset
+    // сбрасывает NoticeProcessor — вешаем его заново.
+    if (!in_transaction_) {
+        std::string revive_err;
+        pg_recover::Health health = pg_recover::revive(conn_, &revive_err);
+        if (health == pg_recover::Health::Failed) throw QueryError("database unavailable: " + revive_err, "");
+        if (health == pg_recover::Health::Reconnected) PQsetNoticeProcessor(conn_, ignore_notice, nullptr);
     }
 
     std::vector<const char*> values;
@@ -58,8 +69,10 @@ Result Database::exec_locked(const std::string& sql, const std::vector<Param>& p
     for (const auto& p : params) values.push_back(p ? p->c_str() : nullptr);
 
     auto started = std::chrono::steady_clock::now();
-    PGresult* res = PQexecParams(conn_, sql.c_str(), static_cast<int>(values.size()), nullptr, values.data(), nullptr,
-                                 nullptr, 0);
+    bool reconnected = false;
+    PGresult* res = pg_recover::exec_params(conn_, sql, static_cast<int>(values.size()), values.data(),
+                                            in_transaction_, &reconnected);
+    if (reconnected) PQsetNoticeProcessor(conn_, ignore_notice, nullptr);
     double duration_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
 
     // В журнал — только SQL с плейсхолдерами: параметры — тексты спек и
@@ -96,13 +109,18 @@ Result Database::exec_locked(const std::string& sql, const std::vector<Param>& p
     return out;
 }
 
-Database::Transaction::Transaction(Database& db) : db_(db), lock_(db.mutex_) { db_.exec_locked("BEGIN", {}); }
+Database::Transaction::Transaction(Database& db) : db_(db), lock_(db.mutex_) {
+    db_.exec_locked("BEGIN", {});
+    db_.in_transaction_ = true; // с этого момента PQreset запрещён (потерял бы BEGIN)
+}
 
 Database::Transaction::~Transaction() {
     if (committed_) return;
     try {
         db_.exec_locked("ROLLBACK", {});
+        db_.in_transaction_ = false;
     } catch (const std::exception& ex) {
+        db_.in_transaction_ = false; // соединение мертво: транзакции на сервере уже нет
         applog::error(std::string("ROLLBACK failed: ") + ex.what());
     }
 }
@@ -113,6 +131,7 @@ Result Database::Transaction::exec(const std::string& sql, const std::vector<Par
 
 void Database::Transaction::commit() {
     db_.exec_locked("COMMIT", {});
+    db_.in_transaction_ = false;
     committed_ = true;
 }
 

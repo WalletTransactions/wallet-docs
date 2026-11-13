@@ -7,6 +7,7 @@ add_executable(wallet_docs_tests
     test_http.cpp
     test_indexer.cpp
     test_llm.cpp
+    test_pg_recover.cpp
     test_rate_limit.cpp
     test_search.cpp
 )
