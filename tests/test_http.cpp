@@ -7,6 +7,7 @@
 #include "httplib.h"
 #include "test_framework.hpp"
 #include "test_keys.hpp"
+#include "util/metrics.hpp"
 
 namespace {
 
@@ -176,6 +177,36 @@ TEST(ask_not_found_skips_llm) {
     REQUIRE(r->status == 200);
     CHECK_EQ(json::parse(r->body), json({{"answer", "В описании системы этого нет."}, {"sources", json::array()}}));
     CHECK_EQ(h.chat.calls, 0);
+}
+
+namespace {
+// Счётчики глобальны на процесс — сравниваем приращение.
+long refusals(const std::string& stage) {
+    std::string text = metrics::render();
+    std::string key = "docs_refusals_total{stage=\"" + stage + "\"} ";
+    std::size_t p = text.find(key);
+    return p == std::string::npos ? 0 : std::stol(text.substr(p + key.size()));
+}
+} // namespace
+
+TEST(refusal_metric_by_stage) {
+    Harness h;
+    h.seed();
+    long before_none = refusals("no_fragments");
+    long before_llm = refusals("llm");
+
+    CHECK_EQ(h.ask_q(android(), "Какая погода в Москве?")->status, 200);
+    CHECK_EQ(refusals("no_fragments"), before_none + 1);
+    CHECK_EQ(refusals("llm"), before_llm);
+
+    h.chat.reply = "В описании системы этого нет.";
+    CHECK_EQ(h.ask_q(android(), "синхронизация")->status, 200);
+    CHECK_EQ(refusals("llm"), before_llm + 1);
+    CHECK_EQ(refusals("no_fragments"), before_none + 1);
+
+    h.chat.reply = "Синхронизация описана [1].";
+    CHECK_EQ(h.ask_q(android(), "синхронизация")->status, 200);
+    CHECK_EQ(refusals("llm"), before_llm + 1);
 }
 
 TEST(ask_without_citations) {

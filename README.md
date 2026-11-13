@@ -141,6 +141,9 @@ curl -sS -X POST http://127.0.0.1:8091/api/docs/ask -H "Authorization: Bearer $J
 - `docs_answers_total{result}` — `answered`, `not_found`, `bad_request`, `rate_limited`,
   `llm_unavailable`, `database_unavailable`;
 - `docs_answers_without_sources_total` — ответы LLM без единой ссылки `[n]`;
+- `docs_refusals_total{stage}` — отказы «В описании системы этого нет.»: `no_fragments` — поиск
+  ничего не нашёл (LLM не вызывалась), `llm` — отказ дала модель (по ним считается доля ложных
+  отказов);
 - `docs_auth_rejected_total{reason}` — причины `401`/`403`;
 - `docs_index_total{result}` — `ok`, `unauthorized`, `bad_request`, `disabled`, `failed`.
 
