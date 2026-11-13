@@ -2,12 +2,12 @@
 
 ## 1. Таблица области
 
-- [ ] 1.1 `scope_for`: платформа `mcp` → `wallet-web`, `wallet-web-eqdefault`, `wallet-mcp`, виды `spec`; порядок проверок прежний (`admin` первой). Проверка: юнит-тесты строки таблицы — токен `mcp` без `role`; `mcp` с `role: "admin"` в токене (синтетический случай) остаётся админом по существующему правилу, а токен MCP без `role` — нет; `platform: "other"` по-прежнему пуст.
-- [ ] 1.2 Тест доступа: JWT с `aud` ∋ `wallet-docs`, `scope` ∋ `docs:ask`, `platform: "mcp"`, без `role` проходит `GET /api/docs/status` (`200`), без `docs:ask` — `401`. Проверка: `ctest`.
+- [x] 1.1 `scope_for`: платформа `mcp` → `wallet-web`, `wallet-web-eqdefault`, `wallet-mcp`, виды `spec`; порядок проверок прежний (`admin` первой). Проверка: юнит-тесты строки таблицы — токен `mcp` без `role`; `mcp` с `role: "admin"` в токене (синтетический случай) остаётся админом по существующему правилу, а токен MCP без `role` — нет; `platform: "other"` по-прежнему пуст.
+- [x] 1.2 Тест доступа: JWT с `aud` ∋ `wallet-docs`, `scope` ∋ `docs:ask`, `platform: "mcp"`, без `role` проходит `GET /api/docs/status` (`200`), без `docs:ask` — `401`. Проверка: `ctest`.
 
 ## 2. Документация
 
-- [ ] 2.1 README (таблица области) и `openapi.yaml` (описание области для `status` и `ask`). Проверка: Swagger UI на `/docs` показывает строку `mcp`; примеры `curl` из README работают.
+- [x] 2.1 README (таблица области) и `openapi.yaml` (описание области для `status` и `ask`). Проверка: Swagger UI на `/docs` показывает строку `mcp`; примеры `curl` из README работают.
 
 ## 3. Индекс и проверка на стенде
 
