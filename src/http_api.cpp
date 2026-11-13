@@ -24,6 +24,9 @@ constexpr const char* kAskMetric = "docs_answers_total";
 constexpr const char* kAskHelp = "Вопросы POST /api/docs/ask по исходу.";
 constexpr const char* kNoSourcesMetric = "docs_answers_without_sources_total";
 constexpr const char* kNoSourcesHelp = "Ответы LLM без единой ссылки [n] на фрагмент (design D8, риск «модель не ставит ссылок»).";
+constexpr const char* kRefusalMetric = "docs_refusals_total";
+constexpr const char* kRefusalHelp =
+    "Отказы «В описании системы этого нет.» по стадии: no_fragments — поиск ничего не нашёл (LLM не вызывалась), llm — отказ дала модель.";
 constexpr const char* kIndexMetric = "docs_index_total";
 constexpr const char* kIndexHelp = "Заливки PUT /docs/index/{repo} по исходу.";
 
@@ -154,6 +157,7 @@ void handle_ask(const Deps& deps, const httplib::Request& req, httplib::Response
 
     if (fragments.empty()) {
         metrics::inc_counter(kAskMetric, kAskHelp, "result", "not_found");
+        metrics::inc_counter(kRefusalMetric, kRefusalHelp, "stage", "no_fragments");
         reply(res, 200, json{{"answer", answer::kNotFound}, {"sources", json::array()}});
         return;
     }
@@ -171,6 +175,9 @@ void handle_ask(const Deps& deps, const httplib::Request& req, httplib::Response
         metrics::inc_counter(kNoSourcesMetric, kNoSourcesHelp, "reason", "no_citations");
     }
     metrics::inc_counter(kAskMetric, kAskHelp, "result", "answered");
+    if (cited.sources.empty() && cited.answer.find(answer::kNotFound) != std::string::npos) {
+        metrics::inc_counter(kRefusalMetric, kRefusalHelp, "stage", "llm");
+    }
     json sources = json::array();
     for (const answer::Source& s : cited.sources) {
         sources.push_back({{"repo", s.repo}, {"capability", s.capability}, {"heading", s.heading}});
