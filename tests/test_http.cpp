@@ -93,6 +93,19 @@ TEST(status_by_token) {
     CHECK_EQ(h.client().Get("/api/docs/status")->status, 401);
 }
 
+TEST(status_mcp_token_without_role) {
+    Harness h;
+    auto claims = testkeys::user_claims("user", "mcp");
+    claims.erase("role");
+    auto ok = h.status(testkeys::google_auth().sign(claims));
+    REQUIRE(ok);
+    CHECK_EQ(ok->status, 200);
+
+    auto no_scope = claims;
+    no_scope["scope"] = "reports:read";
+    CHECK_EQ(h.status(testkeys::google_auth().sign(no_scope))->status, 401);
+}
+
 TEST(status_with_session_cookie) {
     Harness h;
     auto r = h.client().Get("/api/docs/status", httplib::Headers{{"Cookie", "session=" + android()}});

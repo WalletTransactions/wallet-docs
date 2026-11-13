@@ -24,9 +24,23 @@ TEST(scope_table) {
 
     CHECK(docsaccess::scope_for("user", "other").empty());
     CHECK(docsaccess::scope_for("user", "telegram").empty());
-    CHECK(docsaccess::scope_for("user", "mcp").empty());
     CHECK(docsaccess::scope_for("user", "").empty());
     CHECK(docsaccess::scope_for("", "").empty());
+}
+
+TEST(scope_mcp_without_role) {
+    // Токен MCP роли не несёт: область — web + wallet-mcp, только spec.
+    for (const char* role : {"", "user"}) {
+        auto mcp = docsaccess::scope_for(role, "mcp");
+        CHECK(!mcp.all);
+        REQUIRE(mcp.repos.size() == 3);
+        CHECK_EQ(mcp.repos[0], std::string("wallet-web"));
+        CHECK_EQ(mcp.repos[1], std::string("wallet-web-eqdefault"));
+        CHECK_EQ(mcp.repos[2], std::string("wallet-mcp"));
+        CHECK_EQ(mcp.kinds, std::vector<std::string>{"spec"});
+    }
+    // Синтетический случай: role=admin в токене по прежнему правилу остаётся админом.
+    CHECK(docsaccess::scope_for("admin", "mcp").all);
 }
 
 TEST(request_token_bearer_then_cookie) {

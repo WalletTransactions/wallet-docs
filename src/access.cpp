@@ -122,6 +122,9 @@ store::Scope scope_for(const std::string& role, const std::string& platform) {
     } else if (platform == "web") {
         s.repos = {"wallet-web", "wallet-web-eqdefault"};
         s.kinds = {"spec"};
+    } else if (platform == "mcp") {
+        s.repos = {"wallet-web", "wallet-web-eqdefault", "wallet-mcp"};
+        s.kinds = {"spec"};
     }
     return s;
 }
