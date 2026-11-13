@@ -13,6 +13,10 @@ namespace {
 // «в», «как» и прочие русские служебные слова совпали бы почти с каждым
 // чанком и отказ «этого нет» не наступал бы никогда. Лексемы объединяются
 // через ИЛИ: вопрос своими словами редко содержит все слова чанка.
+// Вес вида в ORDER BY (1.0 для spec, 0.6 для change/archive) — те же значения,
+// что search::kSpecWeight/kOtherKindWeight: вес нужен уже при отборе 20
+// кандидатов, иначе открытые change (их в индексе больше, чем spec) вытесняют
+// канонические спеки до слияния. Пороги отсечения остаются на сырых значениях.
 constexpr const char* kTextSql = R"SQL(
 WITH q AS (
     SELECT to_tsquery('simple', coalesce(string_agg(quote_literal(l), ' | '), '')) AS tq
@@ -29,7 +33,7 @@ WHERE d.tsv @@ q.tq
   AND ts_rank(d.tsv, q.tq) > 0
   AND ($2::boolean OR d.repo = ANY($3::text[]))
   AND d.kind = ANY($4::text[])
-ORDER BY ts_rank(d.tsv, q.tq) DESC, d.id
+ORDER BY ts_rank(d.tsv, q.tq) * (CASE WHEN d.kind = 'spec' THEN 1.0 ELSE 0.6 END) DESC, d.id
 LIMIT $5
 )SQL";
 
@@ -41,7 +45,7 @@ WHERE d.embedding IS NOT NULL
   AND ($2::boolean OR d.repo = ANY($3::text[]))
   AND d.kind = ANY($4::text[])
   AND (d.embedding <=> $1::vector) <= $5::float8
-ORDER BY d.embedding <=> $1::vector, d.id
+ORDER BY (d.embedding <=> $1::vector) / (CASE WHEN d.kind = 'spec' THEN 1.0 ELSE 0.6 END), d.id
 LIMIT $6
 )SQL";
 
