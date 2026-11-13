@@ -1,0 +1,25 @@
+{
+  "_comment": "Контрольный набор качества справки (change docs-answer-quality). expect — 'repo/capability' раздела, который должен быть в sources, либо null, если в видимых спеках ответа нет и верен отказ. platform — чьим токеном задаётся вопрос (область по токену). holdout — не использовать при подборе промпта и параметров.",
+  "questions": [
+    {"id": 1,  "platform": "android", "q": "Как работает синхронизация данных с сервером?", "expect": "android-wallet/sync-run"},
+    {"id": 2,  "platform": "android", "q": "Как сменить язык приложения?", "expect": "android-wallet/ui-language"},
+    {"id": 3,  "platform": "android", "q": "Как экспортировать данные из приложения?", "expect": "android-wallet/data-export", "holdout": true},
+    {"id": 4,  "platform": "android", "q": "Как приложение учитывает долги?", "expect": "android-wallet/debts"},
+    {"id": 5,  "platform": "android", "q": "Как делается переоценка активов?", "expect": "android-wallet/asset-revaluation"},
+    {"id": 6,  "platform": "android", "q": "Как синхронизируются иконки категорий и счетов?", "expect": "android-wallet/icon-sync"},
+    {"id": 7,  "platform": "android", "q": "Что происходит при первом запуске приложения?", "expect": "android-wallet/app-start", "holdout": true},
+    {"id": 8,  "platform": "android", "q": "Как добавить расход с помощью ИИ?", "expect": "android-wallet/ai-expense-entry"},
+    {"id": 9,  "platform": "android", "q": "Как устроены курсы и валютные пары?", "expect": "android-wallet/currency-pairs"},
+    {"id": 10, "platform": "android", "q": "Как отфильтровать список операций?", "expect": "android-wallet/operations-filter"},
+    {"id": 11, "platform": "android", "q": "Как привязать Telegram-бота к аккаунту?", "expect": null},
+    {"id": 12, "platform": "android", "q": "Как импортировать банковскую выписку?", "expect": "android-wallet/ai-statement-import"},
+    {"id": 13, "platform": "admin",   "q": "Как гейтвей проверяет JWT?", "expect": "wallet-gateway/edge-jwt-gate"},
+    {"id": 14, "platform": "admin",   "q": "Как выдаются и отзываются MCP-токены?", "expect": "google-auth/mcp-tokens", "holdout": true},
+    {"id": 15, "platform": "admin",   "q": "Как удаляется аккаунт пользователя?", "expect": "wallet-api/account-deletion"},
+    {"id": 16, "platform": "admin",   "q": "Где и как хранятся иконки (блобы)?", "expect": "wallet-api/icon-blobs", "holdout": true},
+    {"id": 17, "platform": "admin",   "q": "Как привязывается Telegram-бот?", "expect": "google-auth/telegram-linking"},
+    {"id": 18, "platform": "admin",   "q": "Как обменять токен пользователя на токен для другого сервиса?", "expect": "google-auth/token-exchange", "holdout": true},
+    {"id": 19, "platform": "admin",   "q": "Как релиз попадает на тестовый контур?", "expect": "wallet-infra/release-promotion"},
+    {"id": 20, "platform": "admin",   "q": "Какой алгоритм сжатия видео использует система?", "expect": null, "holdout": true}
+  ]
+}
