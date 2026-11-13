@@ -78,14 +78,19 @@ EmbedResult parse_embeddings(int http_status, const std::string& body, std::size
     return r;
 }
 
-json chat_body(const std::string& model, const std::string& system, const std::string& user) {
-    return json{{"model", model},
-                {"messages", json::array({{{"role", "system"}, {"content", system}},
-                                          {{"role", "user"}, {"content", user}}})},
-                // Ответ по фрагментам, а не творчество.
-                {"temperature", 0.2},
-                {"max_tokens", 1024},
-                {"stream", false}};
+json chat_body(const std::string& model, const std::string& system, const std::string& user,
+               const std::string& reasoning_effort) {
+    json body{{"model", model},
+              {"messages", json::array({{{"role", "system"}, {"content", system}},
+                                        {{"role", "user"}, {"content", user}}})},
+              // Ответ по фрагментам, а не творчество.
+              {"temperature", 0.2},
+              {"max_tokens", 1024},
+              {"stream", false}};
+    // Модели с рассуждением (gemma-4 в LM Studio) без этого тратят max_tokens на «мысли»:
+    // content пуст, ответ идёт десятки секунд.
+    if (!reasoning_effort.empty()) body["reasoning_effort"] = reasoning_effort;
+    return body;
 }
 
 std::string strip_think(const std::string& content) {
@@ -174,7 +179,8 @@ public:
 
     ChatResult complete(const std::string& system, const std::string& user) override {
         std::string error;
-        auto res = post(opts_, base_, "/chat/completions", chat_body(opts_.model, system, user), error);
+        auto res = post(opts_, base_, "/chat/completions",
+                         chat_body(opts_.model, system, user, opts_.reasoning_effort), error);
         if (!res) {
             ChatResult r;
             r.error = error;

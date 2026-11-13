@@ -60,6 +60,9 @@ LoadResult load(const Lookup& env) {
     c.llm_url = strip_trailing_slash(env("LLM_URL").value_or(""));
     c.llm_model = env("LLM_MODEL").value_or("");
     c.llm_api_key = env("LLM_API_KEY").value_or("");
+    // Пустое значение env здесь равно «не задано» (см. process_env), поэтому отключение — явное `off`.
+    c.llm_reasoning_chat = env("LLM_REASONING_CHAT").value_or(c.llm_reasoning_chat);
+    if (c.llm_reasoning_chat == "off") c.llm_reasoning_chat.clear();
     c.embed_model = env("EMBED_MODEL").value_or("");
     c.index_token = env("INDEX_TOKEN").value_or("");
     c.host = env("HOST").value_or(c.host);

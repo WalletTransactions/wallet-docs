@@ -16,6 +16,9 @@ struct Config {
     std::string llm_url;       // OpenAI-совместимый корень, например http://host:1234/v1
     std::string llm_model;     // чат-модель ответа
     std::string llm_api_key;   // пусто — заголовок Authorization не передаётся
+    // reasoning_effort чат-модели (LLM_REASONING_CHAT): не задана — "none", "off" — поле не передаётся
+    // (тогда здесь пустая строка).
+    std::string llm_reasoning_chat = "none";
     std::string embed_model;   // nomic-embed-text-v1.5
     std::string index_token;   // пусто — PUT /docs/index отвечает 503
     std::string host = "127.0.0.1";

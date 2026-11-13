@@ -58,6 +58,45 @@ TEST(chat_body_shape) {
     CHECK_EQ(b["messages"][1]["content"], "user");
 }
 
+TEST(chat_body_reasoning_effort) {
+    auto none = llm::chat_body("m", "s", "u", "none");
+    CHECK_EQ(none["reasoning_effort"], "none");
+    auto low = llm::chat_body("m", "s", "u", "low");
+    CHECK_EQ(low["reasoning_effort"], "low");
+    CHECK(!llm::chat_body("m", "s", "u", "").contains("reasoning_effort"));
+    CHECK(!llm::chat_body("m", "s", "u").contains("reasoning_effort"));
+}
+
+// Чат уносит reasoning_effort в тело запроса, эмбеддинги — нет (LLM_REASONING_CHAT).
+TEST(http_chat_and_embedder_reasoning_effort) {
+    httplib::Server stub;
+    nlohmann::json chat_seen, embed_seen;
+    stub.Post("/v1/chat/completions", [&](const httplib::Request& req, httplib::Response& res) {
+        chat_seen = nlohmann::json::parse(req.body);
+        res.set_content(R"({"choices":[{"message":{"content":"ответ [1]"}}]})", "application/json");
+    });
+    stub.Post("/v1/embeddings", [&](const httplib::Request& req, httplib::Response& res) {
+        embed_seen = nlohmann::json::parse(req.body);
+        res.set_content(embedding_response(embed_seen["input"].size()).dump(), "application/json");
+    });
+    int port = stub.bind_to_any_port("127.0.0.1");
+    std::thread t([&] { stub.listen_after_bind(); });
+    stub.wait_until_ready();
+
+    const std::string url = "http://127.0.0.1:" + std::to_string(port) + "/v1";
+    auto chat = llm::make_http_chat({url, "m", "", 5000, "none"});
+    auto c = chat->complete("sys", "user");
+    auto embedder = llm::make_http_embedder({url, "nomic", "", 5000});
+    auto e = embedder->embed({"x"});
+    stub.stop();
+    t.join();
+
+    REQUIRE(c.ok);
+    CHECK_EQ(chat_seen["reasoning_effort"], "none");
+    REQUIRE(e.ok);
+    CHECK(!embed_seen.contains("reasoning_effort"));
+}
+
 // Клиент эмбеддингов против заглушки LM Studio: путь, модель, префиксы.
 TEST(http_embedder_against_stub) {
     httplib::Server stub;

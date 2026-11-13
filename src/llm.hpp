@@ -51,7 +51,9 @@ struct ChatResult {
     std::string error;
 };
 
-nlohmann::json chat_body(const std::string& model, const std::string& system, const std::string& user);
+// reasoning_effort — как в OpenAI-совместимом API ("none", "low", …); пусто — поле не добавляется.
+nlohmann::json chat_body(const std::string& model, const std::string& system, const std::string& user,
+                         const std::string& reasoning_effort = "");
 ChatResult parse_chat(int http_status, const std::string& body);
 // Вырезает рассуждения <think>…</think> и пробелы по краям.
 std::string strip_think(const std::string& content);
@@ -67,6 +69,7 @@ struct HttpOptions {
     std::string model;   // LLM_MODEL или EMBED_MODEL
     std::string api_key; // пусто — без Authorization
     int timeout_ms = 120000;
+    std::string reasoning_effort; // только чат (LLM_REASONING_CHAT); пусто — не передаётся
 };
 
 std::unique_ptr<Embedder> make_http_embedder(const HttpOptions& opts);
