@@ -35,13 +35,18 @@ def ask(url, tok, question):
         json.dumps({"question": question}).encode(),
         {"Authorization": "Bearer " + tok, "Content-Type": "application/json"},
     )
-    t0 = time.monotonic()
-    try:
-        with urllib.request.urlopen(req, timeout=180) as r:
-            body = json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        return {"error": "HTTP %d" % e.code}, time.monotonic() - t0
-    return body, time.monotonic() - t0
+    # 429 — лимит запросов сервиса, не оценка качества: ждём и повторяем,
+    # время ответа считаем только по последней (успешной) попытке.
+    for attempt in range(6):
+        t0 = time.monotonic()
+        try:
+            with urllib.request.urlopen(req, timeout=180) as r:
+                body = json.loads(r.read())
+            return body, time.monotonic() - t0
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or attempt == 5:
+                return {"error": "HTTP %d" % e.code}, time.monotonic() - t0
+            time.sleep(20)
 
 
 def main():

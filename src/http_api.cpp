@@ -142,7 +142,8 @@ void handle_ask(const Deps& deps, const httplib::Request& req, httplib::Response
     try {
         store::Candidates c =
             deps.store->search(scope, question, query_vector, search::kCandidates, search::kMaxVectorDistance);
-        fragments = search::fuse(c);
+        // Нет ни одного слова вопроса в видимых спеках — отказ без LLM (D2).
+        if (!search::is_off_topic(c)) fragments = search::fuse(c);
         applog::info("docs search", {{"event", "docs_search"},
                                      {"text_candidates", c.text.size()},
                                      {"vector_candidates", c.vector.size()},
