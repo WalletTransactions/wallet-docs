@@ -8,6 +8,8 @@ namespace search {
 
 double kind_weight(const std::string& kind) { return kind == "spec" ? kSpecWeight : kOtherKindWeight; }
 
+bool is_off_topic(const store::Candidates& c) { return c.text.empty(); }
+
 std::vector<store::Hit> fuse(const store::Candidates& c, std::size_t top, double k) {
     struct Entry {
         const store::Hit* hit = nullptr;

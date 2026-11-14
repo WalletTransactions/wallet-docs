@@ -73,6 +73,25 @@ TEST(kind_weight_values) {
     CHECK_EQ(search::kind_weight("change"), search::kind_weight("archive"));
 }
 
+// Сигнал «не по теме» (D2): нет ни одного полнотекстового кандидата — отказ без LLM,
+// как бы близки ни были векторы (расстояния по теме и не по теме пересекаются).
+TEST(off_topic_without_text_candidates_even_with_close_vectors) {
+    store::Candidates c;
+    c.vector = {hit(1), hit(2)};
+    CHECK(search::is_off_topic(c));
+    CHECK(search::is_off_topic(store::Candidates{}));
+}
+
+// Вопрос по теме с самым далёким вектором проходит: решает наличие слова в спеках.
+TEST(on_topic_with_text_candidate_passes_regardless_of_vectors) {
+    store::Candidates c;
+    c.text = {hit(1)};
+    CHECK(!search::is_off_topic(c));
+    c.vector = {hit(2)};
+    CHECK(!search::is_off_topic(c));
+    CHECK_EQ(search::fuse(c).size(), static_cast<std::size_t>(2));
+}
+
 TEST(fuse_empty) { CHECK(search::fuse(store::Candidates{}).empty()); }
 
 TEST(vector_literal_format) {
