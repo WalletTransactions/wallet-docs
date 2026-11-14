@@ -74,6 +74,7 @@ add_library(wallet_docs_core STATIC
     ${WALLET_COMMON_DIR}/util/jwt_claims.cpp
     ${WALLET_COMMON_DIR}/util/log.cpp
     ${WALLET_COMMON_DIR}/util/metrics.cpp
+    ${WALLET_COMMON_DIR}/util/pg_recover.cpp
 )
 target_include_directories(wallet_docs_core PUBLIC
     ${CMAKE_SOURCE_DIR}/src
