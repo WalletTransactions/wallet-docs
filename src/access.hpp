@@ -38,7 +38,9 @@ Identity verify(const std::string& token, const KeyLookup& keys);
 
 // Таблица области — константа (D5): ошибка в конфиге не должна открыть чужие
 // спеки. admin — всё; platform android — android-wallet/spec; web —
-// wallet-web и wallet-web-eqdefault/spec; иначе — пусто.
+// wallet-web и wallet-web-eqdefault/spec; mcp — web + wallet-mcp; telegram —
+// продуктовые репозитории/spec (без wallet-gateway, wallet-infra, wallet-common);
+// иначе — пусто.
 store::Scope scope_for(const std::string& role, const std::string& platform);
 
 } // namespace docsaccess

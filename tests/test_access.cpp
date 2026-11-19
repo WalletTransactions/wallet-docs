@@ -23,7 +23,6 @@ TEST(scope_table) {
     CHECK_EQ(web.kinds, std::vector<std::string>{"spec"});
 
     CHECK(docsaccess::scope_for("user", "other").empty());
-    CHECK(docsaccess::scope_for("user", "telegram").empty());
     CHECK(docsaccess::scope_for("user", "").empty());
     CHECK(docsaccess::scope_for("", "").empty());
 }
@@ -41,6 +40,28 @@ TEST(scope_mcp_without_role) {
     }
     // Синтетический случай: role=admin в токене по прежнему правилу остаётся админом.
     CHECK(docsaccess::scope_for("admin", "mcp").all);
+}
+
+TEST(scope_telegram) {
+    // Change telegram-docs-scope: токен Telegram роли не несёт; вопросы про любой
+    // продукт, только spec, без внутренних репозиториев.
+    for (const char* role : {"", "user"}) {
+        auto tg = docsaccess::scope_for(role, "telegram");
+        CHECK(!tg.empty());
+        CHECK(!tg.all);
+        CHECK_EQ(tg.kinds, std::vector<std::string>{"spec"});
+        const std::vector<std::string> expected = {
+            "android-wallet", "google-auth",    "wallet-ai",     "wallet-api",
+            "wallet-docs",    "wallet-mcp",     "wallet-report", "wallet-site",
+            "wallet-telegram", "wallet-web",    "wallet-web-eqdefault"};
+        CHECK_EQ(tg.repos, expected);
+        for (const char* closed : {"wallet-gateway", "wallet-infra", "wallet-common"}) {
+            for (const auto& repo : tg.repos) CHECK(repo != closed);
+        }
+        for (const auto& kind : tg.kinds) CHECK(kind != "change" && kind != "archive");
+    }
+    // role=admin в токене по прежнему правилу остаётся админом.
+    CHECK(docsaccess::scope_for("admin", "telegram").all);
 }
 
 TEST(request_token_bearer_then_cookie) {
