@@ -30,7 +30,8 @@ Jenkins ──────── X-Index-Token ─ PUT /docs/index/{repo} (се�
   | `platform: android` | `android-wallet` | `spec` |
   | `platform: web` | `wallet-web`, `wallet-web-eqdefault` | `spec` |
   | `platform: mcp` (токен MCP, без `role`) | `wallet-web`, `wallet-web-eqdefault`, `wallet-mcp` | `spec` |
-  | иначе (`telegram`, без платформы) | — | `403 {"error":"forbidden"}` |
+  | `platform: telegram` (токен чата Telegram, без `role`) | `android-wallet`, `google-auth`, `wallet-ai`, `wallet-api`, `wallet-docs`, `wallet-mcp`, `wallet-report`, `wallet-site`, `wallet-telegram`, `wallet-web`, `wallet-web-eqdefault` (без `wallet-gateway`, `wallet-infra`, `wallet-common`) | `spec` |
+  | иначе (другая платформа, без платформы) | — | `403 {"error":"forbidden"}` |
 
 - `/docs/index/{repo}` гейтвей не проксирует. Jenkins ходит напрямую по сети контура с
   `X-Index-Token` = `INDEX_TOKEN`; токены сравниваются за постоянное время.

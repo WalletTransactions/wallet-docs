@@ -10,7 +10,9 @@ info:
       `scope` ∋ `docs:ask` (Bearer или cookie `session`). Область документации задаёт сервер
       по `role` и `platform` токена: admin — все репозитории и виды; android —
       `android-wallet`, спеки; web — `wallet-web`, `wallet-web-eqdefault`, спеки; mcp (токен
-      MCP, `role` нет) — `wallet-web`, `wallet-web-eqdefault`, `wallet-mcp`, спеки; иначе 403.
+      MCP, `role` нет) — `wallet-web`, `wallet-web-eqdefault`, `wallet-mcp`, спеки; telegram
+      (токен чата, `role` нет) — продуктовые репозитории, спеки, без `wallet-gateway`,
+      `wallet-infra`, `wallet-common`; иначе 403.
     - `/docs/index/{repo}` — только по сети контура (гейтвей не проксирует), Jenkins с
       `X-Index-Token`.
     - Служебные `/healthz`, `/version`, `/metrics`, `/openapi.yaml`, `/docs` — без аутентификации.

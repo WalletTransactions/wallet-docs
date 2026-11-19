@@ -107,6 +107,36 @@ TEST(status_mcp_token_without_role) {
     CHECK_EQ(h.status(testkeys::google_auth().sign(no_scope))->status, 401);
 }
 
+// Токен Telegram: обмен токена чата wallet-ai на aud wallet-docs — без role.
+std::string telegram_token() {
+    auto claims = testkeys::user_claims("user", "telegram");
+    claims.erase("role");
+    return testkeys::google_auth().sign(claims);
+}
+
+TEST(status_telegram_token_without_role) {
+    Harness h;
+    auto ok = h.status(telegram_token());
+    REQUIRE(ok);
+    CHECK_EQ(ok->status, 200);
+    CHECK_EQ(json::parse(ok->body), json({{"enabled", true}}));
+}
+
+TEST(ask_telegram_sees_products_but_not_gateway) {
+    Harness h;
+    h.seed();
+    h.chat.reply = "Синхронизация описана [1] [2].";
+    auto r = h.ask_q(telegram_token(), "синхронизация");
+    REQUIRE(r->status == 200);
+    auto body = json::parse(r->body);
+    REQUIRE(body["sources"].size() == 2);
+    CHECK_EQ(body["sources"][0]["repo"], "android-wallet");
+    CHECK_EQ(body["sources"][1]["repo"], "wallet-web");
+    CHECK(h.chat.last_user.find("гейтвея") == std::string::npos); // wallet-gateway закрыт
+    CHECK(h.chat.last_user.find("телефона") != std::string::npos);
+    CHECK(h.chat.last_user.find("браузера") != std::string::npos);
+}
+
 TEST(status_with_session_cookie) {
     Harness h;
     auto r = h.client().Get("/api/docs/status", httplib::Headers{{"Cookie", "session=" + android()}});

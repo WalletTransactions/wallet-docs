@@ -125,6 +125,14 @@ store::Scope scope_for(const std::string& role, const std::string& platform) {
     } else if (platform == "mcp") {
         s.repos = {"wallet-web", "wallet-web-eqdefault", "wallet-mcp"};
         s.kinds = {"spec"};
+    } else if (platform == "telegram") {
+        // Change telegram-docs-scope: Telegram-чат (wallet-ai → ask_docs) отвечает
+        // на вопросы про любой продукт. Закрыты внутренние wallet-gateway,
+        // wallet-infra, wallet-common и виды change/archive — как и у MCP.
+        s.repos = {"android-wallet", "google-auth",   "wallet-ai",   "wallet-api",
+                   "wallet-docs",    "wallet-mcp",    "wallet-report", "wallet-site",
+                   "wallet-telegram", "wallet-web",   "wallet-web-eqdefault"};
+        s.kinds = {"spec"};
     }
     return s;
 }

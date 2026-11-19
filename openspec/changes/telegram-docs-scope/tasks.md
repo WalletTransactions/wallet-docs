@@ -4,13 +4,13 @@
 
 ## 1. Область Telegram
 
-- [ ] 1.1 Добавить в `scope_for` (`src/access.cpp`) ветку `platform == "telegram"`: репозитории `android-wallet`, `google-auth`, `wallet-ai`, `wallet-api`, `wallet-docs`, `wallet-mcp`, `wallet-report`, `wallet-site`, `wallet-telegram`, `wallet-web`, `wallet-web-eqdefault`, вид `spec`; проверка: ctest — новый тест области Telegram
-- [ ] 1.2 Тесты: `scope_table` больше не ждёт пустую область для `telegram` (остаются пустыми `other`, пустая платформа, пустая роль); новый тест `scope_telegram`: репозитории и вид `spec`, нет `all`, нет `wallet-gateway`, `wallet-infra`, `wallet-common`, нет `change`/`archive`; админ с `platform: telegram` — `all`; проверка: ctest зелёный
-- [ ] 1.3 Тест статуса и вопроса: токен Telegram без `role` — `GET /api/docs/status` отвечает `200`, `POST /api/docs/ask` доходит до поиска (не `403`); проверка: ctest
+- [x] 1.1 Добавить в `scope_for` (`src/access.cpp`) ветку `platform == "telegram"`: репозитории `android-wallet`, `google-auth`, `wallet-ai`, `wallet-api`, `wallet-docs`, `wallet-mcp`, `wallet-report`, `wallet-site`, `wallet-telegram`, `wallet-web`, `wallet-web-eqdefault`, вид `spec`; проверка: ctest — новый тест области Telegram
+- [x] 1.2 Тесты: `scope_table` больше не ждёт пустую область для `telegram` (остаются пустыми `other`, пустая платформа, пустая роль); новый тест `scope_telegram`: репозитории и вид `spec`, нет `all`, нет `wallet-gateway`, `wallet-infra`, `wallet-common`, нет `change`/`archive`; админ с `platform: telegram` — `all`; проверка: ctest зелёный
+- [x] 1.3 Тест статуса и вопроса: токен Telegram без `role` — `GET /api/docs/status` отвечает `200`, `POST /api/docs/ask` доходит до поиска (не `403`); проверка: ctest
 
 ## 2. Документация
 
-- [ ] 2.1 Обновить таблицу области в `README.md` (строка `telegram` вместо «иначе (`telegram`, без платформы)») и описание в `openapi.yaml`, если там перечислены платформы; проверка: в README и openapi нет утверждения, что Telegram получает `403`
+- [x] 2.1 Обновить таблицу области в `README.md` (строка `telegram` вместо «иначе (`telegram`, без платформы)») и описание в `openapi.yaml`, если там перечислены платформы; проверка: в README и openapi нет утверждения, что Telegram получает `403`
 
 ## 3. Выкатка и проверка
 
