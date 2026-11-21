@@ -32,9 +32,9 @@
 
 ## 6. Выкатка и проверка
 
-- [ ] 6.1 Выкатить wallet-docs на test (rc-тег, один C++-сервис за раз, миграция вместе с кодом); проверка: `GET /healthz` и `GET /version` показывают `0.1.6-rc.N`, сервис стартует, чанки прежних видов целы
-- [ ] 6.2 Залить на test `README.md` и `infra/env/README.md` репозитория `wallet-infra` вместе с его `openspec/` вручную через `PUT /docs/index/{repo}` с `X-Index-Token`; проверка: ответ `200`, `chunks` > 0, `skipped` равен числу посторонних файлов, чанки `ops` есть в таблице
-- [ ] 6.3 Спросить админским токеном «Как включить mTLS для служебного порта google-auth?»; проверка: ответ `200`, в `sources` есть `infra/env` с видом `ops`
+- [x] 6.1 Выкатить wallet-docs на test (rc-тег, один C++-сервис за раз, миграция вместе с кодом); проверка: `GET /healthz` и `GET /version` показывают `0.1.6-rc.N`, сервис стартует, чанки прежних видов целы (2026-11-21: `0.1.6-rc.1` ok 19:20 UTC, затем `0.1.7-rc.1` ok 20:59 UTC — вес ops как у spec)
+- [x] 6.2 Залить на test `README.md` и `infra/env/README.md` репозитория `wallet-infra` вместе с его `openspec/` вручную через `PUT /docs/index/{repo}` с `X-Index-Token`; проверка: ответ `200`, `chunks` > 0, `skipped` равен числу посторонних файлов, чанки `ops` есть в таблице (2026-11-21: `wallet-infra` с README — `chunks 333`, `ops` 34; затем `docs-index.sh test all`, 13 репозиториев; заливка по mTLS)
+- [x] 6.3 Спросить админским токеном «Как включить mTLS для служебного порта google-auth?»; проверка: ответ `200`, в `sources` есть `infra/env` с видом `ops` (2026-11-21, 0.1.7-rc.1, админ: ответ по mTLS, `sources` — README `wallet-mcp`, `wallet-telegram`, `wallet-infra` (`infra/env`, обе секции); на 0.1.6-rc.1 было «В описании системы этого нет.» — причина вес 0.6)
 - [ ] 6.4 Спросить тот же вопрос токеном `platform: "android"`, затем токеном `platform: "telegram"` и MCP-токеном админа; проверка: во всех трёх ответ «В описании системы этого нет.», `sources` без `ops`
 
 ## Workflow follow-up
