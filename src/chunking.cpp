@@ -108,6 +108,23 @@ std::string file_name(const std::string& path) {
     return pos == std::string::npos ? path : path.substr(pos + 1);
 }
 
+// Вид ops (спека docs-indexing, «Вид ops — справка по развёртыванию»): файл с
+// именем ровно README.md на любой глубине, кроме вендорных и служебных
+// каталогов — их README не про наш стек и только зашумляет индекс.
+// capability — каталог файла; корневой README — «README».
+std::optional<FileInfo> classify_ops(const std::vector<std::string>& parts) {
+    if (parts.back() != "README.md") return std::nullopt;
+    static const char* const kSkipDirs[] = {"third_party", "node_modules", ".worktrees", "build", "vendor"};
+    std::string dir;
+    for (std::size_t i = 0; i + 1 < parts.size(); ++i) {
+        for (const char* skip : kSkipDirs) {
+            if (parts[i] == skip) return std::nullopt;
+        }
+        dir += (dir.empty() ? "" : "/") + parts[i];
+    }
+    return FileInfo{"ops", dir.empty() ? std::string("README") : dir};
+}
+
 // Режет файл на секции по заголовкам, для которых is_break вернул true.
 // Текст до первого такого заголовка — секция с heading = `# …` или именем
 // файла.
@@ -159,7 +176,8 @@ std::optional<FileInfo> classify_path(const std::string& path) {
     for (const std::string& p : parts) {
         if (p.empty() || p == "." || p == "..") return std::nullopt;
     }
-    if (parts.size() < 3 || parts[0] != "openspec") return std::nullopt;
+    if (parts[0] != "openspec") return classify_ops(parts);
+    if (parts.size() < 3) return std::nullopt;
 
     if (parts[1] == "specs") {
         // openspec/specs/<раздел>/spec.md — ровно так.

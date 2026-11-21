@@ -200,6 +200,48 @@ TEST(ask_admin_sees_all) {
     CHECK_EQ(json::parse(r->body)["sources"].size(), 3u);
 }
 
+namespace {
+// Чанк README (вид ops) в репозитории, который область android и telegram иначе видит.
+void seed_ops(Harness& h) {
+    store::NewChunk c;
+    c.repo = "android-wallet";
+    c.path = "infra/env/README.md";
+    c.kind = "ops";
+    c.capability = "infra/env";
+    c.heading = "Переключатель mTLS";
+    c.content = "Переключатель mTLS включается настройкой WALLET_INTERNAL_MTLS";
+    h.store.rows.push_back(c);
+}
+} // namespace
+
+TEST(ask_ops_only_for_admin) {
+    Harness h;
+    seed_ops(h);
+    h.chat.reply = "Включается настройкой [1].";
+    auto r = h.ask_q(admin(), "Переключатель mTLS");
+    REQUIRE(r->status == 200);
+    auto body = json::parse(r->body);
+    REQUIRE(body["sources"].size() == 1);
+    CHECK_EQ(body["sources"][0]["capability"], "infra/env");
+    CHECK(h.chat.last_user.find("справка по развёртыванию") != std::string::npos);
+}
+
+TEST(ask_ops_hidden_from_user_telegram_and_mcp) {
+    auto mcp_no_role = [] {
+        auto claims = testkeys::user_claims("user", "mcp");
+        claims.erase("role");
+        return testkeys::google_auth().sign(claims);
+    };
+    for (const std::string& token : {android(), telegram_token(), mcp_no_role(), testkeys::token("user", "web")}) {
+        Harness h;
+        seed_ops(h);
+        auto r = h.ask_q(token, "Переключатель mTLS");
+        REQUIRE(r->status == 200);
+        CHECK_EQ(json::parse(r->body), json({{"answer", "В описании системы этого нет."}, {"sources", json::array()}}));
+        CHECK_EQ(h.chat.calls, 0);
+    }
+}
+
 TEST(ask_not_found_skips_llm) {
     Harness h;
     h.seed();
