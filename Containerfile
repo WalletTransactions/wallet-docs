@@ -63,6 +63,9 @@ COPY third_party/swagger-ui/ /app/vendor/swagger-ui/
 COPY migrations/ /migrations/
 
 # LOG_DIR не задан -> логи в stdout/stderr.
+# Метка поддержки взаимного TLS (change add-internal-mtls, design D8).
+LABEL org.wallet.mtls="1"
+
 USER appuser
 EXPOSE 8089
 

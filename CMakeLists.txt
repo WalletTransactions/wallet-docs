@@ -72,6 +72,7 @@ add_library(wallet_docs_core STATIC
     ${WALLET_COMMON_DIR}/util/jwks.cpp
     ${WALLET_COMMON_DIR}/util/jwt.cpp
     ${WALLET_COMMON_DIR}/util/jwt_claims.cpp
+    ${WALLET_COMMON_DIR}/net/tls.cpp
     ${WALLET_COMMON_DIR}/util/log.cpp
     ${WALLET_COMMON_DIR}/util/metrics.cpp
     ${WALLET_COMMON_DIR}/util/pg_recover.cpp
@@ -82,7 +83,11 @@ target_include_directories(wallet_docs_core PUBLIC
     ${WALLET_COMMON_DIR}
     ${CMAKE_BINARY_DIR}/generated
 )
+# TLS у httplib: взаимный TLS внутри контура (net/tls из wallet-common, change add-internal-mtls).
+# PUBLIC — одинаково во всех единицах трансляции (иначе классы httplib различаются по раскладке).
+target_compile_definitions(wallet_docs_core PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)
 target_link_libraries(wallet_docs_core PUBLIC
+    OpenSSL::SSL
     OpenSSL::Crypto
     PostgreSQL::PostgreSQL
     Threads::Threads
