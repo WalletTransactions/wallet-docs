@@ -71,9 +71,10 @@ TEST(fuse_archive_far_ahead_still_wins) {
 TEST(kind_weight_values) {
     CHECK(search::kind_weight("spec") > search::kind_weight("archive"));
     CHECK_EQ(search::kind_weight("change"), search::kind_weight("archive"));
-    // README (ops) может отставать от спеки: вес как у change и archive, ниже spec.
-    CHECK_EQ(search::kind_weight("ops"), search::kind_weight("archive"));
-    CHECK(search::kind_weight("spec") > search::kind_weight("ops"));
+    // ops (README, только админу) весит как spec: с весом change/archive он тонул в топе
+    // среди 20 кандидатов-спек, и вопросы про развёртывание получали отказ.
+    CHECK_EQ(search::kind_weight("ops"), search::kind_weight("spec"));
+    CHECK(search::kind_weight("ops") > search::kind_weight("archive"));
 }
 
 // Сигнал «не по теме» (D2): нет ни одного полнотекстового кандидата — отказ без LLM,
