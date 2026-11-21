@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 
+#include "net/tls.hpp"
 #include "access.hpp"
 #include "config.hpp"
 #include "db.hpp"
@@ -104,7 +105,22 @@ int main() {
     deps.limiter = &limiter;
     deps.index_token = cfg.index_token;
 
-    httplib::Server svr;
+    // Взаимный TLS внутри контура (change add-internal-mtls, шаг 7): INTERNAL_MTLS=true — сервер
+    // требует клиентский сертификат от CA контура; иначе обычный HTTP, как раньше. Неполные TLS_*
+    // или нечитаемые файлы — ошибка старта, а не молчаливый возврат на HTTP.
+    auto tls_settings = nettls::settings_from_env();
+    if (!tls_settings.error.empty()) {
+        applog::error(tls_settings.error);
+        return 1;
+    }
+    std::string tls_error;
+    auto svr_owner = nettls::make_server(nettls::server_config(tls_settings), &tls_error);
+    if (!svr_owner) {
+        applog::error(tls_error);
+        return 1;
+    }
+    httplib::Server& svr = *svr_owner;
+    if (tls_settings.serve) applog::info("mTLS: сервер требует клиентский сертификат (INTERNAL_MTLS=true)");
     svr.set_pre_routing_handler(handle_pre_routing);
     svr.set_payload_max_length(httpapi::kMaxBodyBytes);
     httpapi::register_routes(svr, deps);
