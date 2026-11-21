@@ -26,7 +26,7 @@ Jenkins ──────── X-Index-Token ─ PUT /docs/index/{repo} (се�
 
   | Токен | Репозитории | Виды |
   |---|---|---|
-  | `role: admin` (любая платформа) | все | `spec`, `change`, `archive` |
+  | `role: admin` (любая платформа) | все | `spec`, `change`, `archive`, `ops` |
   | `platform: android` | `android-wallet` | `spec` |
   | `platform: web` | `wallet-web`, `wallet-web-eqdefault` | `spec` |
   | `platform: mcp` (токен MCP, без `role`) | `wallet-web`, `wallet-web-eqdefault`, `wallet-mcp` | `spec` |
@@ -66,7 +66,11 @@ Jenkins ──────── X-Index-Token ─ PUT /docs/index/{repo} (се�
 
 - Индексируются только `openspec/specs/<раздел>/spec.md` (вид `spec`) и `.md` внутри
   `openspec/changes/<имя>/` (вид `change`, а в `archive/` — `archive`; раздел — имя
-  change). Остальное (`openspec/project.md`, файлы вне `openspec/`, пути с `..`) считается в
+  change). Кроме того, файлы с именем ровно `README.md` на любой глубине репозитория — вид
+  `ops` (справка по развёртыванию), раздел — каталог файла (`README`, `infra/env`); README в
+  `third_party/`, `node_modules/`, `.worktrees/`, `build/`, `vendor/` и внутри `openspec/` в
+  `ops` не входят. Вид `ops` видит только `role: admin`; планы `docs/TODO_*.md` не индексируются.
+  Остальное (`openspec/project.md`, прочие файлы вне `openspec/`, пути с `..`) считается в
   `skipped`.
 - Чанки: в любом `spec.md` — `## Purpose` и каждый `### Requirement:` вместе со
   сценариями. В остальных `.md` — секции `##`. Чанк длиннее 6000 байт режется по абзацам с
@@ -127,6 +131,8 @@ curl -sS -X POST http://127.0.0.1:8091/api/docs/ask -H "Authorization: Bearer $J
 
 ## База
 
+- `migrations/000002_doc_chunks_kind_ops.{up,down}.sql` — расширяет `CHECK` на `kind` значением
+  `ops` (down удаляет чанки `ops` и возвращает прежний `CHECK`).
 - `migrations/000001_init.{up,down}.sql` — таблица `doc_chunks`: `repo`, `path`, `kind`,
   `capability`, `heading`, `content`, `content_hash`, `embedding vector(768)`, `tsv`
   (генерируемая колонка `russian || simple`), `indexed_at`. Индексы: `(repo, kind)` и GIN

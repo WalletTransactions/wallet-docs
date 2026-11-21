@@ -113,7 +113,9 @@ store::Scope scope_for(const std::string& role, const std::string& platform) {
     store::Scope s;
     if (role == "admin") {
         s.all = true;
-        s.kinds = {"spec", "change", "archive"};
+        // ops (change docs-ops-kind) — README по развёртыванию: только по role=admin.
+        // У токенов бота, MCP и обмена role нет, поэтому им ops не достаётся.
+        s.kinds = {"spec", "change", "archive", "ops"};
         return s;
     }
     if (platform == "android") {

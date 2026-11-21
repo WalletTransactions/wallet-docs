@@ -50,6 +50,25 @@ TEST(first_upload_embeds_everything) {
     CHECK(emb.inputs[0].rfind("search_document: ", 0) == 0);
 }
 
+TEST(readme_files_become_ops_chunks) {
+    fakes::MemStore db;
+    fakes::FakeEmbedder emb;
+    std::vector<indexer::File> files = {
+        {"README.md", "# Сервис\n\nВведение.\n\n## Запуск\n\nКоманда.\n"},
+        {"infra/env/README.md", "# Контур\n\n## Переключатели\n\nТекст.\n"},
+        {"docs/TODO_x.md", "# План\n\n## Шаг\n\nТекст.\n"},
+        {"third_party/lib/README.md", "# Чужое\n\n## Шаг\n\nТекст.\n"},
+        {"src/main.cpp", "int main(){}"},
+    };
+    auto s = indexer::index_repo(db, &emb, "wallet-infra", files);
+    CHECK_EQ(s.chunks, 3u); // README: введение + «Запуск»; infra/env: «Переключатели» (заголовок без текста отбрасывается)
+    CHECK_EQ(s.skipped, 3u);
+    for (const auto& r : db.rows) CHECK_EQ(r.kind, std::string("ops"));
+    bool has_env = false;
+    for (const auto& r : db.rows) has_env = has_env || r.capability == "infra/env";
+    CHECK(has_env);
+}
+
 TEST(repeat_upload_reuses_without_requests) {
     fakes::MemStore db;
     fakes::FakeEmbedder emb;

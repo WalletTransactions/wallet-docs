@@ -5,7 +5,7 @@
 TEST(scope_table) {
     auto admin = docsaccess::scope_for("admin", "web");
     CHECK(admin.all);
-    CHECK_EQ(admin.kinds.size(), 3u);
+    CHECK_EQ(admin.kinds.size(), 4u);
     auto admin_no_platform = docsaccess::scope_for("admin", "");
     CHECK(admin_no_platform.all);
 
@@ -40,6 +40,26 @@ TEST(scope_mcp_without_role) {
     }
     // Синтетический случай: role=admin в токене по прежнему правилу остаётся админом.
     CHECK(docsaccess::scope_for("admin", "mcp").all);
+}
+
+TEST(scope_admin_has_ops) {
+    for (const char* platform : {"web", "android", "", "other"}) {
+        auto admin = docsaccess::scope_for("admin", platform);
+        CHECK(admin.all);
+        bool has_ops = false;
+        for (const auto& kind : admin.kinds) has_ops = has_ops || kind == "ops";
+        CHECK(has_ops);
+    }
+}
+
+TEST(scope_non_admin_has_no_ops) {
+    // Вид ops — только role=admin; токены бота, MCP и обмена role не несут.
+    for (const char* role : {"", "user", "support"}) {
+        for (const char* platform : {"android", "web", "mcp", "telegram", "other", ""}) {
+            auto s = docsaccess::scope_for(role, platform);
+            for (const auto& kind : s.kinds) CHECK(kind != "ops");
+        }
+    }
 }
 
 TEST(scope_telegram) {

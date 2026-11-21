@@ -10,6 +10,7 @@ const char* kind_label(const std::string& kind) {
     if (kind == "spec") return "действующая спека";
     if (kind == "change") return "незавершённое изменение";
     if (kind == "archive") return "архив изменений (может быть устаревшим)";
+    if (kind == "ops") return "справка по развёртыванию (README, может отставать от спек)";
     return "документ";
 }
 

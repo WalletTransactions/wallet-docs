@@ -43,10 +43,54 @@ TEST(classify_skips_foreign) {
     for (const char* p : {"openspec/project.md", "openspec/config.yaml", "src/main.cpp", "../etc/passwd",
                           "openspec/../../etc/passwd.md", "/openspec/specs/a/spec.md", "openspec/specs/a/notes.md",
                           "openspec/specs/spec.md", "openspec/changes/x.md", "openspec/changes/archive/x.md",
-                          "openspec\\specs\\a\\spec.md", "openspec//specs/a/spec.md", "README.md",
+                          "openspec\\specs\\a\\spec.md", "openspec//specs/a/spec.md",
                           "openspec/changes/x/tasks.txt"}) {
         if (chunking::classify_path(p)) ::testing::report_failure(std::string("должен быть пропущен: ") + p, __FILE__, __LINE__);
     }
+}
+
+TEST(classify_ops_readme) {
+    auto root = chunking::classify_path("README.md");
+    REQUIRE(root.has_value());
+    CHECK_EQ(root->kind, std::string("ops"));
+    CHECK_EQ(root->capability, std::string("README"));
+}
+
+TEST(classify_ops_nested_readme) {
+    auto i = chunking::classify_path("infra/env/README.md");
+    REQUIRE(i.has_value());
+    CHECK_EQ(i->kind, std::string("ops"));
+    CHECK_EQ(i->capability, std::string("infra/env"));
+}
+
+TEST(classify_ops_other_names_skipped) {
+    // Планы и прочие .md вне openspec/ в ops не входят; имя файла — ровно README.md.
+    for (const char* p : {"docs/TODO_service_auth_tls.md", "docs/README.txt", "readme.md", "infra/env/NOTES.md",
+                          "infra/env/README.markdown", "CHANGELOG.md", "../README.md", "infra//README.md"}) {
+        if (chunking::classify_path(p)) ::testing::report_failure(std::string("должен быть пропущен: ") + p, __FILE__, __LINE__);
+    }
+}
+
+TEST(classify_ops_vendor_skipped) {
+    for (const char* p : {"third_party/wallet-common/README.md", "node_modules/x/README.md", ".worktrees/a/README.md",
+                          "build/README.md", "a/vendor/b/README.md"}) {
+        if (chunking::classify_path(p)) ::testing::report_failure(std::string("должен быть пропущен: ") + p, __FILE__, __LINE__);
+    }
+}
+
+TEST(classify_openspec_readme_skipped) {
+    // README внутри openspec/ — не ops: действуют прежние правила openspec/.
+    CHECK(!chunking::classify_path("openspec/README.md"));
+    CHECK(!chunking::classify_path("openspec/specs/sync-run/README.md"));
+    auto in_change = chunking::classify_path("openspec/changes/docs-service/README.md");
+    REQUIRE(in_change.has_value());
+    CHECK_EQ(in_change->kind, std::string("change"));
+}
+
+TEST(ops_readme_chunking) {
+    std::string md = "# Сервис\n\nВведение.\n\n## Запуск\n\nКоманда.\n\n```\n## не заголовок\n```\n\n## Переменные\n\nТаблица.\n";
+    auto chunks = chunking::chunk_markdown("README.md", md);
+    CHECK_EQ(chunks.size(), 3u); // введение, «Запуск», «Переменные»; заголовок в блоке кода не режет
 }
 
 TEST(spec_requirements_with_scenarios) {

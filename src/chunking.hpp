@@ -15,15 +15,18 @@ namespace chunking {
 inline constexpr std::size_t kMaxChunkChars = 6000;
 
 struct FileInfo {
-    std::string kind;       // spec | change | archive
-    std::string capability; // раздел спеки или имя change
+    std::string kind;       // spec | change | archive | ops
+    std::string capability; // раздел спеки, имя change или каталог README (вид ops)
 };
 
 // nullopt — файл не индексируется (считается в skipped):
-// - индексируются только openspec/specs/<раздел>/spec.md и .md внутри
-//   openspec/changes/<имя>/ (в том числе archive/<имя>/);
-// - .md в корне openspec/ (project.md), файлы вне openspec/, не .md, пути
-//   с `..`, абсолютные, с `\` или пустыми сегментами — пропускаются.
+// - индексируются только openspec/specs/<раздел>/spec.md, .md внутри
+//   openspec/changes/<имя>/ (в том числе archive/<имя>/) и файлы с именем
+//   README.md вне openspec/ (вид ops, кроме third_party/, node_modules/,
+//   .worktrees/, build/, vendor/);
+// - .md в корне openspec/ (project.md), прочие файлы вне openspec/ (в том числе
+//   docs/TODO_*.md), не .md, пути с `..`, абсолютные, с `\` или пустыми
+//   сегментами — пропускаются.
 std::optional<FileInfo> classify_path(const std::string& path);
 
 struct Chunk {
