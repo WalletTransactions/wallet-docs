@@ -6,7 +6,11 @@
 
 namespace search {
 
-double kind_weight(const std::string& kind) { return kind == "spec" ? kSpecWeight : kOtherKindWeight; }
+// ops (README) — вес спеки: его видит только админ, а ищет он именно развёртывание;
+// с весом 0.6 чанки ops не проходили в топ (замер на test 2026-11-21, 0.1.6-rc.1).
+double kind_weight(const std::string& kind) {
+    return kind == "spec" || kind == "ops" ? kSpecWeight : kOtherKindWeight;
+}
 
 bool is_off_topic(const store::Candidates& c) { return c.text.empty(); }
 

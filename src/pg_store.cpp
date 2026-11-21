@@ -33,7 +33,7 @@ WHERE d.tsv @@ q.tq
   AND ts_rank(d.tsv, q.tq) > 0
   AND ($2::boolean OR d.repo = ANY($3::text[]))
   AND d.kind = ANY($4::text[])
-ORDER BY ts_rank(d.tsv, q.tq) * (CASE WHEN d.kind = 'spec' THEN 1.0 ELSE 0.6 END) DESC, d.id
+ORDER BY ts_rank(d.tsv, q.tq) * (CASE WHEN d.kind IN ('spec', 'ops') THEN 1.0 ELSE 0.6 END) DESC, d.id
 LIMIT $5
 )SQL";
 
@@ -45,7 +45,7 @@ WHERE d.embedding IS NOT NULL
   AND ($2::boolean OR d.repo = ANY($3::text[]))
   AND d.kind = ANY($4::text[])
   AND (d.embedding <=> $1::vector) <= $5::float8
-ORDER BY (d.embedding <=> $1::vector) / (CASE WHEN d.kind = 'spec' THEN 1.0 ELSE 0.6 END), d.id
+ORDER BY (d.embedding <=> $1::vector) / (CASE WHEN d.kind IN ('spec', 'ops') THEN 1.0 ELSE 0.6 END), d.id
 LIMIT $6
 )SQL";
 
