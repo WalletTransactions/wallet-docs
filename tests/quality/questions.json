@@ -20,6 +20,12 @@
     {"id": 17, "platform": "admin",   "q": "Как привязывается Telegram-бот?", "expect": "google-auth/telegram-linking"},
     {"id": 18, "platform": "admin",   "q": "Как обменять токен пользователя на токен для другого сервиса?", "expect": "google-auth/token-exchange", "holdout": true},
     {"id": 19, "platform": "admin",   "q": "Как релиз попадает на тестовый контур?", "expect": "wallet-infra/release-promotion"},
-    {"id": 20, "platform": "admin",   "q": "Какой алгоритм сжатия видео использует система?", "expect": null, "holdout": true}
+    {"id": 20, "platform": "admin",   "q": "Какой алгоритм сжатия видео использует система?", "expect": null, "holdout": true},
+    {"id": 21, "platform": "admin",   "q": "Как включить mTLS для служебного порта google-auth?", "expect": "wallet-infra/infra/env"},
+    {"id": 22, "platform": "admin",   "q": "Что такое WALLET_AUTH_MTLS_CLIENTS и какие клиенты в него входят?", "expect": "wallet-infra/infra/env"},
+    {"id": 23, "platform": "admin",   "q": "Какие права стоят на ключи сертификатов mTLS и как проверить сертификат сервиса командой openssl verify?", "expect": "wallet-infra/infra/env"},
+    {"id": 24, "platform": "admin",   "q": "Какие каталоги есть в infra и что лежит в infra/diagrams?", "expect": "wallet-infra/README"},
+    {"id": 25, "platform": "android", "q": "Как включить mTLS для служебного порта google-auth?", "expect": null},
+    {"id": 26, "platform": "android", "q": "Какие скрипты лежат в infra/env и что они делают?", "expect": null}
   ]
 }
