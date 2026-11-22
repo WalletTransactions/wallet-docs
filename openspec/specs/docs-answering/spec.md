@@ -17,7 +17,7 @@
 - **THEN** ответ `401`
 
 ### Requirement: Область документации по токену
-Область SHALL определяться по claim'ам `role` и `platform` проверенного токена: `role` = `admin` — все репозитории и виды (`spec`, `change`, `archive`); `platform` = `android` — репозиторий `android-wallet`, вид `spec`; `platform` = `web` — `wallet-web` и `wallet-web-eqdefault`, вид `spec`; `platform` = `mcp` — `wallet-web`, `wallet-web-eqdefault` и `wallet-mcp`, вид `spec`; `platform` = `telegram` — `android-wallet`, `google-auth`, `wallet-ai`, `wallet-api`, `wallet-docs`, `wallet-mcp`, `wallet-report`, `wallet-site`, `wallet-telegram`, `wallet-web` и `wallet-web-eqdefault`, вид `spec`. Любое другое сочетание SHALL давать пустую область. Токен без `role` (токен MCP, токены обмена и токен Telegram) SHALL NOT получать область администратора. Репозитории `wallet-gateway`, `wallet-infra` и `wallet-common` и виды `change` и `archive` SHALL быть недоступны любой области без `role` = `admin`.
+Область SHALL определяться по claim'ам `role` и `platform` проверенного токена: `role` = `admin` — все репозитории и виды (`spec`, `change`, `archive`, `ops`); `platform` = `android` — репозиторий `android-wallet`, вид `spec`; `platform` = `web` — `wallet-web` и `wallet-web-eqdefault`, вид `spec`; `platform` = `mcp` — `wallet-web`, `wallet-web-eqdefault` и `wallet-mcp`, вид `spec`; `platform` = `telegram` — `android-wallet`, `google-auth`, `wallet-ai`, `wallet-api`, `wallet-docs`, `wallet-mcp`, `wallet-report`, `wallet-site`, `wallet-telegram`, `wallet-web` и `wallet-web-eqdefault`, вид `spec`. Любое другое сочетание SHALL давать пустую область. Токен без `role` (токен MCP, токены обмена и токен Telegram) SHALL NOT получать область администратора. Репозитории `wallet-gateway`, `wallet-infra` и `wallet-common` и виды `change`, `archive` и `ops` SHALL быть недоступны любой области без `role` = `admin`.
 
 #### Scenario: Администратор
 - **WHEN** запрос приходит с токеном `role: "admin"` и `platform: "web"`
@@ -46,6 +46,18 @@
 #### Scenario: Чужой клиент
 - **WHEN** токен с `platform: "other"` и `role: "user"`
 - **THEN** область пуста: `GET /api/docs/status` отвечает `403`, а вопрос — `403` без обращения к LLM
+
+#### Scenario: Справка по развёртыванию администратору
+- **WHEN** администратор спрашивает, какими переключателями включается mTLS, а ответ есть в `README` `infra/env`
+- **THEN** фрагмент вида `ops` попадает в поиск и может быть процитирован в `sources`
+
+#### Scenario: Справка по развёртыванию обычному пользователю
+- **WHEN** пользователь с `role: "user"` и `platform: "android"` задаёт тот же вопрос
+- **THEN** чанки вида `ops` в поиск не попадают, ответ — «В описании системы этого нет.»
+
+#### Scenario: Токен без role
+- **WHEN** токен с `platform: "telegram"` или `platform: "mcp"` без `role` задаёт вопрос про развёртывание
+- **THEN** чанки вида `ops` в поиск не попадают
 
 ### Requirement: Статус
 `GET /api/docs/status` SHALL отвечать `200` и `{"enabled": true}`, если токен проходит проверку и область не пуста. Для пустой области ответ — `403` с `{"error": "forbidden"}`, для плохого токена — `401`. Статус SHALL NOT зависеть от доступности LLM и базы: он говорит, что раздел подключён и доступен этому пользователю.
@@ -156,3 +168,18 @@
 #### Scenario: Ложный отказ виден в замере
 - **WHEN** у вопроса задан ожидаемый раздел, а `answer` равен «В описании системы этого нет.»
 - **THEN** скрипт помечает вопрос как ложный отказ и считает их в итоге
+
+### Requirement: Метка и вес вида ops
+В промпте LLM фрагмент вида `ops` SHALL помечаться как «справка по развёртыванию (README, может отставать от спек)». В слиянии рангов и в порядке кандидатов вес `ops` SHALL быть 0.8: ниже, чем у `spec` (1.0), и выше, чем у `change` и `archive` (0.6). При 0.6 чанки `ops` не проходят в топ среди кандидатов-спек, при 1.0 вытесняют спеки на обычных вопросах администратора (замеры на test 2026-11-21/22).
+
+#### Scenario: Вопрос про развёртывание
+- **WHEN** администратор спрашивает «Что такое WALLET_AUTH_MTLS_CLIENTS?» и в индексе есть чанк `ops` с этим переключателем, а спек-кандидатов не меньше десяти
+- **THEN** чанк `ops` попадает в промпт и в `sources`, ответ не «В описании системы этого нет.»
+
+#### Scenario: Вес выше change и archive
+- **WHEN** на один вопрос находятся чанки `ops` и `change` с равной близостью
+- **THEN** чанк `ops` стоит в промпте выше
+
+#### Scenario: Метка в промпте
+- **WHEN** в промпт попадает фрагмент вида `ops`
+- **THEN** его заголовок содержит «справка по развёртыванию (README, может отставать от спек)»
