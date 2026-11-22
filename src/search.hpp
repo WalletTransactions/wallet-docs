@@ -19,9 +19,11 @@ inline constexpr double kRrfK = 60.0;
 // Вес вклада RRF по виду документа: каноническая спека — истина о текущем
 // поведении, change (ещё не влит) и archive (история решений) — вторичны.
 // Без веса их кандидатов больше, и они вытесняют spec (замер 6.3). ops (README
-// по развёртыванию, только админу) весит как spec: иначе при 20 кандидатах-спеках
-// он не попадает в топ-10 (change docs-ops-kind, поправка веса).
+// по развёртыванию, только админу) — между ними: при 0.6 он не попадает в топ-10
+// среди 20 кандидатов-спек, при 1.0 вытесняет спеки на обычных вопросах админа
+// (замеры на test 2026-11-21/22, change docs-ops-kind, D7).
 inline constexpr double kSpecWeight = 1.0;
+inline constexpr double kOpsWeight = 0.8;
 inline constexpr double kOtherKindWeight = 0.6;
 double kind_weight(const std::string& kind);
 

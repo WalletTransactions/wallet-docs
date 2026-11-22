@@ -6,10 +6,13 @@
 
 namespace search {
 
-// ops (README) — вес спеки: его видит только админ, а ищет он именно развёртывание;
-// с весом 0.6 чанки ops не проходили в топ (замер на test 2026-11-21, 0.1.6-rc.1).
+// ops (README) — 0.8: его видит только админ, а ищет он именно развёртывание; с весом
+// 0.6 чанки ops не проходили в топ (test 2026-11-21, 0.1.6-rc.1), с 1.0 вытесняли
+// спеки на обычных вопросах админа (набор качества 2026-11-22, 0.1.7-rc.1).
 double kind_weight(const std::string& kind) {
-    return kind == "spec" || kind == "ops" ? kSpecWeight : kOtherKindWeight;
+    if (kind == "spec") return kSpecWeight;
+    if (kind == "ops") return kOpsWeight;
+    return kOtherKindWeight;
 }
 
 bool is_off_topic(const store::Candidates& c) { return c.text.empty(); }

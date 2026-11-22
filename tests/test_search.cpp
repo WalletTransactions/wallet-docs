@@ -71,9 +71,11 @@ TEST(fuse_archive_far_ahead_still_wins) {
 TEST(kind_weight_values) {
     CHECK(search::kind_weight("spec") > search::kind_weight("archive"));
     CHECK_EQ(search::kind_weight("change"), search::kind_weight("archive"));
-    // ops (README, только админу) весит как spec: с весом change/archive он тонул в топе
-    // среди 20 кандидатов-спек, и вопросы про развёртывание получали отказ.
-    CHECK_EQ(search::kind_weight("ops"), search::kind_weight("spec"));
+    // ops (README, только админу) между spec и change/archive: с 0.6 он тонул в топе
+    // среди 20 кандидатов-спек (вопросы про развёртывание получали отказ), с 1.0
+    // вытеснял спеки на обычных вопросах админа.
+    CHECK_EQ(search::kind_weight("ops"), 0.8);
+    CHECK(search::kind_weight("spec") > search::kind_weight("ops"));
     CHECK(search::kind_weight("ops") > search::kind_weight("archive"));
 }
 
